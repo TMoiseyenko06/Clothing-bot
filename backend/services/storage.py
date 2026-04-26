@@ -6,6 +6,16 @@ from pathlib import Path
 
 OUTFITS_DIR = Path(os.environ.get("OUTFITS_DIR", "./outfits"))
 
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
 
 def _session_dir(session_id: str) -> Path:
     return OUTFITS_DIR / session_id
@@ -62,17 +72,28 @@ def update_onboarding(session_id: str, onboarding: dict):
     _write_session(session_id, session)
 
 
+def try_cache_image(session_id: str, url: str, index: int) -> str | None:
+    """Download and cache a product image. Returns the /files/ URL path or None on failure."""
+    cache_dir = _session_dir(session_id) / "cached_images"
+    cache_dir.mkdir(exist_ok=True)
+    path = _download_image(url, cache_dir, index)
+    if path:
+        return f"/files/{session_id}/cached_images/{path.name}"
+    return None
+
+
 def save_outfit(session_id: str, outfit: dict, feedback: dict | None) -> dict:
     session = load_session(session_id)
     outfit_index = len(session["outfits"]) + 1
 
+    # Only cache images that weren't already cached pre-save
     cache_dir = _session_dir(session_id) / "cached_images"
     cache_dir.mkdir(exist_ok=True)
-
     for i, piece in enumerate(outfit.get("pieces", [])):
-        cached = _cache_image(piece.get("image_url", ""), cache_dir, i + 1)
-        if cached:
-            piece["cached_image"] = f"/files/{session_id}/cached_images/{cached.name}"
+        if not piece.get("cached_image"):
+            path = _download_image(piece.get("image_url", ""), cache_dir, i + 1)
+            if path:
+                piece["cached_image"] = f"/files/{session_id}/cached_images/{path.name}"
 
     outfit_path = _session_dir(session_id) / f"outfit_{outfit_index}.json"
     with open(outfit_path, "w") as f:
@@ -86,18 +107,7 @@ def save_outfit(session_id: str, outfit: dict, feedback: dict | None) -> dict:
     return session
 
 
-_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-}
-
-
-def _cache_image(url: str, cache_dir: Path, index: int) -> Path | None:
+def _download_image(url: str, cache_dir: Path, index: int) -> Path | None:
     if not url:
         return None
     try:
@@ -105,11 +115,7 @@ def _cache_image(url: str, cache_dir: Path, index: int) -> Path | None:
             r = client.get(url, headers=_HEADERS)
             content_type = r.headers.get("content-type", "")
             if r.status_code == 200 and "image" in content_type:
-                ext = "jpg"
-                if "png" in content_type:
-                    ext = "png"
-                elif "webp" in content_type:
-                    ext = "webp"
+                ext = "png" if "png" in content_type else "webp" if "webp" in content_type else "jpg"
                 path = cache_dir / f"piece_{index}.{ext}"
                 with open(path, "wb") as f:
                     f.write(r.content)

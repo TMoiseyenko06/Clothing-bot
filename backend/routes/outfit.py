@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from urllib.parse import quote_plus
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -10,6 +9,8 @@ from services import storage
 
 router = APIRouter()
 log = logging.getLogger(__name__)
+
+_BROWSER_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
 
 class OnboardingPayload(BaseModel):
@@ -30,33 +31,44 @@ class GeneratePayload(BaseModel):
     feedback: Optional[FeedbackPayload] = None
 
 
-def _shopping_fallback(brand: str, name: str) -> str:
-    return f"https://www.google.com/search?tbm=shop&q={quote_plus(brand + ' ' + name)}"
-
-
-async def _validate_piece(piece: dict) -> dict:
-    """HEAD-check the link; replace broken ones with a Google Shopping search."""
-    brand = piece.get("brand", "")
-    name = piece.get("name", "")
+async def _verify_piece(piece: dict, session_id: str, index: int) -> dict | None:
+    """
+    Verify a piece has a working product link AND a downloadable image.
+    Returns the enriched piece (with cached_image set) or None if either check fails.
+    Pieces that fail are dropped from the outfit entirely — no fallbacks.
+    """
+    name = piece.get("name", "?")
     link = piece.get("link", "").strip()
+    image_url = piece.get("image_url", "").strip()
 
     if not link:
-        piece["link"] = _shopping_fallback(brand, name)
-        log.info("No link for '%s' — using Google Shopping fallback", name)
-        return piece
+        log.warning("DROP '%s' — no product link returned", name)
+        return None
 
+    if not image_url:
+        log.warning("DROP '%s' — no image URL returned", name)
+        return None
+
+    # Validate the product link
     try:
-        async with httpx.AsyncClient(timeout=6, follow_redirects=True) as client:
-            r = await client.head(link, headers={"User-Agent": "Mozilla/5.0"})
+        async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
+            r = await client.head(link, headers=_BROWSER_UA)
         if r.status_code >= 400:
-            log.warning("Link %s returned %d for '%s' — using fallback", link, r.status_code, name)
-            piece["link"] = _shopping_fallback(brand, name)
-        else:
-            log.info("Link OK (%d): %s", r.status_code, link)
+            log.warning("DROP '%s' — link returned HTTP %d: %s", name, r.status_code, link)
+            return None
+        log.info("LINK OK (%d) '%s': %s", r.status_code, name, link)
     except Exception as e:
-        log.warning("Link check failed for '%s' (%s) — using fallback", name, e)
-        piece["link"] = _shopping_fallback(brand, name)
+        log.warning("DROP '%s' — link check error: %s", name, e)
+        return None
 
+    # Download and cache the image — piece is dropped if image can't be fetched
+    cached_url = await asyncio.to_thread(storage.try_cache_image, session_id, image_url, index)
+    if not cached_url:
+        log.warning("DROP '%s' — image could not be downloaded: %s", name, image_url)
+        return None
+
+    piece["cached_image"] = cached_url
+    log.info("IMAGE OK '%s': cached at %s", name, cached_url)
     return piece
 
 
@@ -86,26 +98,34 @@ async def generate(payload: GeneratePayload):
             previous_outfits=session.get("outfits", []),
             feedbacks=feedbacks_for_generation,
         )
-        log.info("Outfit #%d generated — concept=%s pieces=%d",
-                 iteration, outfit.get("outfit_concept", "?"), len(outfit.get("pieces", [])))
+        log.info("Outfit generated — concept='%s' candidates=%d",
+                 outfit.get("outfit_concept", "?"), len(outfit.get("pieces", [])))
     except Exception as e:
-        log.error("Outfit generation failed — session=%s iteration=%d error=%s",
-                  payload.session_id, iteration, e, exc_info=True)
+        log.error("Outfit generation failed — session=%s error=%s", payload.session_id, e, exc_info=True)
         raise HTTPException(500, str(e))
 
-    # Step 2: dedicated per-piece search for exact product URL + image
+    # Dedicated per-piece search for exact product URL + image
     log.info("Searching for exact product URLs for %d pieces...", len(outfit.get("pieces", [])))
     outfit["pieces"] = await enrich_pieces_with_urls(outfit.get("pieces", []))
 
-    # Step 3: validate links; replace any still-broken ones with Google Shopping fallback
-    outfit["pieces"] = list(
-        await asyncio.gather(*[_validate_piece(p) for p in outfit.get("pieces", [])])
-    )
+    # Verify each piece: working link + downloadable image required — drop failures
+    results = await asyncio.gather(*[
+        _verify_piece(p, payload.session_id, i + 1)
+        for i, p in enumerate(outfit.get("pieces", []))
+    ])
+    verified = [p for p in results if p is not None]
+
+    log.info("Verified %d/%d pieces with working links and images",
+             len(verified), len(outfit.get("pieces", [])))
+
+    if not verified:
+        raise HTTPException(500, "No pieces with verified links and images could be found. Please try again.")
+
+    outfit["pieces"] = verified
 
     updated_session = await asyncio.to_thread(
         storage.save_outfit, payload.session_id, outfit, feedback_dict
     )
 
-    # Return the saved outfit — it has cached_image paths set by save_outfit
     saved_outfit = updated_session["outfits"][-1]
     return {"outfit": saved_outfit, "outfit_index": len(updated_session["outfits"])}

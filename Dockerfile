@@ -17,6 +17,10 @@ RUN apt-get update \
 # Python backend
 WORKDIR /app/backend
 COPY backend/requirements.txt .
+# Install CPU-only PyTorch first (avoids pulling the huge CUDA variant)
+RUN pip install --no-cache-dir \
+    torch==2.3.0 torchvision==0.18.0 \
+    --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ .
 

@@ -8,8 +8,11 @@ services:
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OUTFITS_DIR=/outfits
+      - HF_MODEL=${HF_MODEL:-}
     volumes:
       - outfits_data:/outfits
+      - hf_cache:/root/.cache/huggingface
 
 volumes:
   outfits_data:
+  hf_cache:

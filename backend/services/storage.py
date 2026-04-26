@@ -86,14 +86,31 @@ def save_outfit(session_id: str, outfit: dict, feedback: dict | None) -> dict:
     return session
 
 
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
 def _cache_image(url: str, cache_dir: Path, index: int) -> Path | None:
     if not url:
         return None
     try:
-        with httpx.Client(timeout=10, follow_redirects=True) as client:
-            r = client.get(url)
-            if r.status_code == 200:
-                path = cache_dir / f"piece_{index}.jpg"
+        with httpx.Client(timeout=12, follow_redirects=True) as client:
+            r = client.get(url, headers=_HEADERS)
+            content_type = r.headers.get("content-type", "")
+            if r.status_code == 200 and "image" in content_type:
+                ext = "jpg"
+                if "png" in content_type:
+                    ext = "png"
+                elif "webp" in content_type:
+                    ext = "webp"
+                path = cache_dir / f"piece_{index}.{ext}"
                 with open(path, "wb") as f:
                     f.write(r.content)
                 return path

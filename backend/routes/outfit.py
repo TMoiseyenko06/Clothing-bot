@@ -106,4 +106,6 @@ async def generate(payload: GeneratePayload):
         storage.save_outfit, payload.session_id, outfit, feedback_dict
     )
 
-    return {"outfit": outfit, "outfit_index": len(updated_session["outfits"])}
+    # Return the saved outfit — it has cached_image paths set by save_outfit
+    saved_outfit = updated_session["outfits"][-1]
+    return {"outfit": saved_outfit, "outfit_index": len(updated_session["outfits"])}

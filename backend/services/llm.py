@@ -45,23 +45,25 @@ Rules:
 - First decide the full outfit concept, then choose pieces that match it
 - Leave "link" and "image_url" as empty strings — they are found separately"""
 
-URL_SEARCH_PROMPT = """Search the web for this exact clothing item and find its product page.
+URL_SEARCH_PROMPT = """Search the web for this exact clothing item and return its product page URL and product image URL.
 
 Brand: {brand}
 Item name: {name}
 Approx price: {price}
 
-Steps you must follow:
-1. Search for "{brand} {name} buy" on the web
-2. Find the listing on the brand's own website OR a major retailer (Nordstrom, ASOS, Zappos, etc.)
-3. Click through to the specific individual product page — the page must show ONLY this one item
-4. Confirm the page has an Add to Cart or Buy button
-5. Find the main product image URL directly from the page (a CDN/static image URL)
+Follow these steps:
+1. Search for "{brand} {name}" on the web
+2. Open the result on the brand's own website OR a major retailer (e.g. Nordstrom, ASOS, Zappos, Revolve)
+3. Confirm the page shows ONLY this one product with an Add to Cart button — not a category or search page
+4. Find the main product image: it must be a direct static CDN URL (e.g. ending in .jpg, .jpeg, .png, or .webp)
+   - Look in the page HTML for <img> tags or og:image meta tags
+   - Do NOT return a base64 string, a placeholder, or a URL that redirects to another page
+   - The image URL should contain the product name or a product ID, not generic words like "placeholder" or "noimage"
 
 Return ONLY this raw JSON — no markdown, no explanation:
-{{"link": "<exact product page URL>", "image_url": "<direct image URL ending in .jpg .png or .webp>"}}
+{{"link": "<exact product page URL>", "image_url": "<direct static image URL>"}}
 
-If you cannot find the exact individual product page, return:
+If you cannot find both a working product page AND a real image URL, return:
 {{"link": "", "image_url": ""}}"""
 
 

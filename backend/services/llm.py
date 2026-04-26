@@ -11,7 +11,7 @@ client = AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
 )
 
-MODEL = "google/gemini-2.5-pro:online"
+MODEL = "anthropic/claude-sonnet-4-5:online"
 log = logging.getLogger(__name__)
 
 OUTFIT_SYSTEM_PROMPT = """You are an expert personal stylist. Your job is to build a complete,

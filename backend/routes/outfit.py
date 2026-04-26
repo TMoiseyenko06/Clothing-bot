@@ -33,23 +33,16 @@ class GeneratePayload(BaseModel):
 
 async def _verify_piece(piece: dict, session_id: str, index: int) -> dict | None:
     """
-    Verify a piece has a working product link AND a downloadable image.
-    Returns the enriched piece (with cached_image set) or None if either check fails.
-    Pieces that fail are dropped from the outfit entirely — no fallbacks.
+    Verify a piece has a working product link — drop it if not.
+    Image is optional: cached if available, emoji placeholder shown if not.
     """
     name = piece.get("name", "?")
     link = piece.get("link", "").strip()
-    image_url = piece.get("image_url", "").strip()
 
     if not link:
         log.warning("DROP '%s' — no product link returned", name)
         return None
 
-    if not image_url:
-        log.warning("DROP '%s' — no image URL returned", name)
-        return None
-
-    # Validate the product link
     try:
         async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
             r = await client.head(link, headers=_BROWSER_UA)
@@ -61,14 +54,16 @@ async def _verify_piece(piece: dict, session_id: str, index: int) -> dict | None
         log.warning("DROP '%s' — link check error: %s", name, e)
         return None
 
-    # Download and cache the image — piece is dropped if image can't be fetched
-    cached_url = await asyncio.to_thread(storage.try_cache_image, session_id, image_url, index)
-    if not cached_url:
-        log.warning("DROP '%s' — image could not be downloaded: %s", name, image_url)
-        return None
+    # Try to cache the image — failure is fine, frontend shows emoji placeholder
+    image_url = piece.get("image_url", "").strip()
+    if image_url:
+        cached_url = await asyncio.to_thread(storage.try_cache_image, session_id, image_url, index)
+        if cached_url:
+            piece["cached_image"] = cached_url
+            log.info("IMAGE OK '%s'", name)
+        else:
+            log.info("IMAGE failed for '%s' — placeholder will show", name)
 
-    piece["cached_image"] = cached_url
-    log.info("IMAGE OK '%s': cached at %s", name, cached_url)
     return piece
 
 

@@ -17,8 +17,6 @@ export default function OutfitCard({ piece }) {
       ? piece.image_url  // fallback to remote if cached failed
       : null
 
-  const fallbackSearch = `https://www.google.com/search?q=${encodeURIComponent(`${piece.brand} ${piece.name}`)}`
-
   return (
     <div className="outfit-card">
       {imgSrc ? (
@@ -41,14 +39,16 @@ export default function OutfitCard({ piece }) {
         <div className="outfit-card-brand">{piece.brand}</div>
         <div className="outfit-card-price">{piece.price}</div>
         <div className="outfit-card-why">{piece.why}</div>
-        <a
-          href={piece.link || fallbackSearch}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="outfit-card-link"
-        >
-          Shop Now →
-        </a>
+        {piece.link && (
+          <a
+            href={piece.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="outfit-card-link"
+          >
+            Shop Now →
+          </a>
+        )}
       </div>
     </div>
   )

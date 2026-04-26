@@ -10,12 +10,15 @@ client = AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
 )
 
-MODEL = "google/gemini-2.5-pro"
+MODEL = "google/gemini-2.5-pro:online"
 log = logging.getLogger(__name__)
 
 OUTFIT_SYSTEM_PROMPT = """You are an expert personal stylist. Your job is to build a complete,
 cohesive outfit for a real person based on their style profile,
 stated preferences, and any feedback from previous outfit attempts.
+
+Search the web to find real, currently available, purchasable clothing items
+with working product page links and direct product image URLs.
 
 ALWAYS return a JSON object only — no markdown, no preamble, no
 explanation outside the JSON. The JSON must match this exact schema:
@@ -25,24 +28,25 @@ explanation outside the JSON. The JSON must match this exact schema:
   "pieces": [
     {
       "category": "Top | Bottom | Shoes | Outerwear | Accessory",
-      "name": "string — specific style or product name",
-      "brand": "string — real brand name",
-      "price": "string — approximate retail price e.g. $89",
-      "link": "",
-      "image_url": "",
+      "name": "string",
+      "brand": "string",
+      "price": "string",
+      "link": "string — direct URL to the product page",
+      "image_url": "string — direct URL to the product image",
       "why": "string — one short sentence (under 15 words) why this works for this person"
     }
   ]
 }
 
 Rules:
-- Choose real brands that are widely available online (e.g. J.Crew, Zara, ASOS, Levi's, Nike)
+- Every piece must be real, in stock, and purchasable today — verify with search
+- The "link" must go directly to the product page, not a search results page
+- The "image_url" must be a direct link to the product image (jpg/png/webp)
 - All pieces must work together cohesively as a complete outfit
 - Respect the user's budget range strictly
 - Incorporate feedback from previous iterations — do not repeat rejected pieces
 - Always include at minimum: Top, Bottom, Shoes
-- First decide the full outfit concept, then find pieces that match it
-- Leave "link" and "image_url" as empty strings — they are filled in automatically"""
+- First decide the full outfit concept, then find pieces that match it"""
 
 
 def _clean_json(text: str) -> str:

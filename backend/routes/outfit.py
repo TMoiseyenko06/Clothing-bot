@@ -4,7 +4,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from services.llm import generate_outfit
-from services.search import enrich_piece
 from services import storage
 
 router = APIRouter()
@@ -61,14 +60,6 @@ async def generate(payload: GeneratePayload):
         log.error("Outfit generation failed — session=%s iteration=%d error=%s",
                   payload.session_id, iteration, e, exc_info=True)
         raise HTTPException(500, str(e))
-
-    # Enrich all pieces with real product links + images in parallel
-    try:
-        enriched = await asyncio.gather(*[enrich_piece(p) for p in outfit.get("pieces", [])])
-        outfit["pieces"] = list(enriched)
-        log.info("Enriched %d pieces with real product data", len(enriched))
-    except Exception as e:
-        log.warning("Product enrichment partially failed: %s", e)
 
     updated_session = await asyncio.to_thread(
         storage.save_outfit, payload.session_id, outfit, feedback_dict

@@ -77,7 +77,7 @@ async def analyze_selfie(image_bytes: bytes, content_type: str) -> str:
                 ],
             }
         ],
-        max_tokens=1024,
+        max_tokens=512,
     )
     return response.choices[0].message.content
 
@@ -130,7 +130,7 @@ async def generate_outfit(
                 {"role": "system", "content": OUTFIT_SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
             ],
-            max_tokens=2048,
+            max_tokens=1000,
         )
         raw = response.choices[0].message.content
         try:

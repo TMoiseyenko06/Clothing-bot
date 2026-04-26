@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OUTFITS_DIR=/outfits
+    volumes:
+      - outfits_data:/outfits
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${APP_PORT:-80}:80"
+    depends_on:
+      - backend
+
+volumes:
+  outfits_data:

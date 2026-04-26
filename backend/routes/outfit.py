@@ -1,88 +1,40 @@
-import asyncio
 import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
-from services.llm import generate_outfit, enrich_pieces_with_urls
-from services.scraper import scrape_product_image
-from services import storage
+from services import deepfashion, storage
 
 router = APIRouter()
 log = logging.getLogger(__name__)
 
 
-class OnboardingPayload(BaseModel):
-    gender: str
-    fit: str
-    budget: str
-    occasion: str
-
-
-class FeedbackPayload(BaseModel):
-    rating: int
-    text: str
-
-
-class GeneratePayload(BaseModel):
+class RefreshPayload(BaseModel):
     session_id: str
-    onboarding: Optional[OnboardingPayload] = None
-    feedback: Optional[FeedbackPayload] = None
 
 
-async def _fill_missing_image(piece: dict) -> dict:
-    """If a piece has a link but no image, scrape the product page for og:image."""
-    if piece.get("image_url") or not piece.get("link"):
-        return piece
-    img = await scrape_product_image(piece["link"])
-    if img:
-        piece["image_url"] = img
-        log.info("Scraped image for '%s': %s", piece.get("name"), img)
-    return piece
+class SwapPayload(BaseModel):
+    session_id: str
+    category: str
 
 
-@router.post("/outfit/generate")
-async def generate(payload: GeneratePayload):
+@router.post("/outfit/refresh")
+async def refresh(payload: RefreshPayload):
     session = storage.load_session(payload.session_id)
     if not session:
         raise HTTPException(404, "Session not found")
+    outfit = await deepfashion.search_outfit(session["profile"])
+    storage.update_outfit(payload.session_id, outfit)
+    return {"outfit": outfit}
 
-    if payload.onboarding:
-        storage.update_onboarding(payload.session_id, payload.onboarding.model_dump())
-        session["onboarding"] = payload.onboarding.model_dump()
 
-    onboarding = session.get("onboarding") or {}
-    feedback_dict = payload.feedback.model_dump() if payload.feedback else None
-
-    existing_feedbacks = session.get("feedbacks", [])
-    feedbacks_for_generation = existing_feedbacks + ([feedback_dict] if feedback_dict else [])
-    iteration = len(session.get("outfits", [])) + 1
-
-    log.info("Generating outfit #%d — session=%s", iteration, payload.session_id)
-
-    try:
-        outfit = await generate_outfit(
-            style_profile=session["style_profile"],
-            onboarding=onboarding,
-            previous_outfits=session.get("outfits", []),
-            feedbacks=feedbacks_for_generation,
-        )
-        log.info("Outfit generated — concept='%s' pieces=%d",
-                 outfit.get("outfit_concept", "?"), len(outfit.get("pieces", [])))
-    except Exception as e:
-        log.error("Outfit generation failed — session=%s error=%s", payload.session_id, e, exc_info=True)
-        raise HTTPException(500, str(e))
-
-    # Per-piece search for exact product URL + image
-    outfit["pieces"] = await enrich_pieces_with_urls(outfit.get("pieces", []))
-
-    # Scrape product page for any piece that has a link but no image
-    outfit["pieces"] = list(
-        await asyncio.gather(*[_fill_missing_image(p) for p in outfit["pieces"]])
-    )
-
-    updated_session = await asyncio.to_thread(
-        storage.save_outfit, payload.session_id, outfit, feedback_dict
-    )
-
-    saved_outfit = updated_session["outfits"][-1]
-    return {"outfit": saved_outfit, "outfit_index": len(updated_session["outfits"])}
+@router.post("/outfit/swap")
+async def swap(payload: SwapPayload):
+    session = storage.load_session(payload.session_id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+    current_id = session["outfit"].get(payload.category, {}).get("id")
+    item = await deepfashion.swap_item(session["profile"], payload.category, exclude_id=current_id)
+    if not item:
+        raise HTTPException(404, f"No more items for {payload.category}")
+    outfit = {**session["outfit"], payload.category: item}
+    storage.update_outfit(payload.session_id, outfit)
+    return {"item": item}

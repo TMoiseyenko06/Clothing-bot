@@ -1,37 +1,51 @@
 const BASE = '/api'
 
-export async function uploadSelfie(file) {
+export async function analyzeSelfie(file) {
   const form = new FormData()
   form.append('file', file)
   const res = await fetch(`${BASE}/analyze`, { method: 'POST', body: form })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || 'Upload failed')
+    throw new Error(err.detail || 'Analysis failed')
   }
   return res.json()
 }
 
-export async function generateOutfit(payload) {
-  const res = await fetch(`${BASE}/outfit/generate`, {
+export async function refreshOutfit(session_id) {
+  const res = await fetch(`${BASE}/outfit/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ session_id }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || 'Generation failed')
+    throw new Error(err.detail || 'Refresh failed')
   }
   return res.json()
 }
 
-export async function getSessions() {
-  const res = await fetch(`${BASE}/sessions`)
-  if (!res.ok) throw new Error('Failed to load sessions')
+export async function swapItem(session_id, category) {
+  const res = await fetch(`${BASE}/outfit/swap`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id, category }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Swap failed')
+  }
   return res.json()
 }
 
-export async function getSession(sessionId) {
-  const res = await fetch(`${BASE}/sessions/${sessionId}`)
-  if (!res.ok) throw new Error('Session not found')
+export async function tryOn(session_id, item_id, category) {
+  const res = await fetch(`${BASE}/tryon`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id, item_id, category }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || 'Try-on failed')
+  }
   return res.json()
 }

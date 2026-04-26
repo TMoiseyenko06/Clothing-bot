@@ -1,20 +1,9 @@
-import os
 import json
-import httpx
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 OUTFITS_DIR = Path(os.environ.get("OUTFITS_DIR", "./outfits"))
-
-_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-}
 
 
 def _session_dir(session_id: str) -> Path:
@@ -25,20 +14,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def create_session(session_id: str, selfie_path: str, style_profile: str) -> dict:
+def create_session(session_id: str, selfie_path: str, profile: dict) -> dict:
     OUTFITS_DIR.mkdir(parents=True, exist_ok=True)
     _session_dir(session_id).mkdir(parents=True, exist_ok=True)
     session = {
         "session_id": session_id,
         "selfie_path": selfie_path,
-        "style_profile": style_profile,
-        "onboarding": None,
-        "outfits": [],
-        "feedbacks": [],
+        "selfie_url": f"/files/{session_id}/selfie.jpg",
+        "profile": profile,
+        "outfit": {},
+        "tryon_results": {},
         "created_at": _now(),
-        "updated_at": _now(),
     }
-    _write_session(session_id, session)
+    _write(session_id, session)
     return session
 
 
@@ -50,89 +38,32 @@ def load_session(session_id: str) -> dict | None:
         return json.load(f)
 
 
-def _write_session(session_id: str, session: dict):
-    path = _session_dir(session_id) / "session.json"
-    with open(path, "w") as f:
-        json.dump(session, f, indent=2)
-
-
 def save_selfie(session_id: str, data: bytes) -> str:
     d = _session_dir(session_id)
     d.mkdir(parents=True, exist_ok=True)
     path = d / "selfie.jpg"
-    with open(path, "wb") as f:
-        f.write(data)
+    path.write_bytes(data)
     return str(path)
 
 
-def update_onboarding(session_id: str, onboarding: dict):
+def update_outfit(session_id: str, outfit: dict) -> dict:
     session = load_session(session_id)
-    session["onboarding"] = onboarding
-    session["updated_at"] = _now()
-    _write_session(session_id, session)
-
-
-def try_cache_image(session_id: str, url: str, index: int) -> str | None:
-    """Download and cache a product image. Returns the /files/ URL path or None on failure."""
-    cache_dir = _session_dir(session_id) / "cached_images"
-    cache_dir.mkdir(exist_ok=True)
-    path = _download_image(url, cache_dir, index)
-    if path:
-        return f"/files/{session_id}/cached_images/{path.name}"
-    return None
-
-
-def save_outfit(session_id: str, outfit: dict, feedback: dict | None) -> dict:
-    session = load_session(session_id)
-    outfit_index = len(session["outfits"]) + 1
-
-    # Only cache images that weren't already cached pre-save
-    cache_dir = _session_dir(session_id) / "cached_images"
-    cache_dir.mkdir(exist_ok=True)
-    for i, piece in enumerate(outfit.get("pieces", [])):
-        if not piece.get("cached_image"):
-            path = _download_image(piece.get("image_url", ""), cache_dir, i + 1)
-            if path:
-                piece["cached_image"] = f"/files/{session_id}/cached_images/{path.name}"
-
-    outfit_path = _session_dir(session_id) / f"outfit_{outfit_index}.json"
-    with open(outfit_path, "w") as f:
-        json.dump(outfit, f, indent=2)
-
-    session["outfits"].append(outfit)
-    if feedback:
-        session["feedbacks"].append(feedback)
-    session["updated_at"] = _now()
-    _write_session(session_id, session)
+    session["outfit"] = outfit
+    _write(session_id, session)
     return session
 
 
-def _download_image(url: str, cache_dir: Path, index: int) -> Path | None:
-    if not url:
-        return None
-    try:
-        with httpx.Client(timeout=12, follow_redirects=True) as client:
-            r = client.get(url, headers=_HEADERS)
-            content_type = r.headers.get("content-type", "")
-            if r.status_code == 200 and "image" in content_type:
-                ext = "png" if "png" in content_type else "webp" if "webp" in content_type else "jpg"
-                path = cache_dir / f"piece_{index}.{ext}"
-                with open(path, "wb") as f:
-                    f.write(r.content)
-                return path
-    except Exception:
-        pass
-    return None
+def save_tryon(session_id: str, item_id: str, image_bytes: bytes) -> str:
+    path = _session_dir(session_id) / f"tryon_{item_id}.jpg"
+    path.write_bytes(image_bytes)
+    url = f"/files/{session_id}/tryon_{item_id}.jpg"
+    session = load_session(session_id)
+    session["tryon_results"][item_id] = url
+    _write(session_id, session)
+    return url
 
 
-def list_sessions() -> list:
-    if not OUTFITS_DIR.exists():
-        return []
-    sessions = []
-    for d in sorted(OUTFITS_DIR.iterdir(), reverse=True):
-        if d.is_dir():
-            session_file = d / "session.json"
-            if session_file.exists():
-                with open(session_file) as f:
-                    sessions.append(json.load(f))
-    return sessions
+def _write(session_id: str, session: dict):
+    path = _session_dir(session_id) / "session.json"
+    with open(path, "w") as f:
+        json.dump(session, f, indent=2)

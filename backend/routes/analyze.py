@@ -1,14 +1,10 @@
-import os
 import uuid
 import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from services.llm import analyze_selfie
-from services import storage
+from services import fashionclip, deepfashion, storage
 
 router = APIRouter()
 log = logging.getLogger(__name__)
-
-_HF_MODEL = os.environ.get("HF_MODEL", "")
 
 
 @router.post("/analyze")
@@ -17,23 +13,26 @@ async def analyze(file: UploadFile = File(...)):
     if not data:
         raise HTTPException(400, "Empty file")
 
-    content_type = file.content_type or "image/jpeg"
     session_id = str(uuid.uuid4())
-    log.info("Analyze request — session=%s content_type=%s size=%d mode=%s",
-             session_id, content_type, len(data), "local" if _HF_MODEL else "cloud")
+    log.info("Analyze — session=%s size=%d", session_id, len(data))
 
     try:
         selfie_path = storage.save_selfie(session_id, data)
+        profile = await fashionclip.analyze_selfie(data)
+        log.info("Profile — %s", profile)
 
-        if _HF_MODEL:
-            from services.hf import analyze_selfie_local
-            style_profile = await analyze_selfie_local(data)
-        else:
-            style_profile = await analyze_selfie(data, content_type)
+        outfit = await deepfashion.search_outfit(profile)
+        log.info("Outfit — categories=%s", list(outfit.keys()))
 
-        storage.create_session(session_id, selfie_path, style_profile)
-        log.info("Analyze complete — session=%s profile_len=%d", session_id, len(style_profile))
-        return {"session_id": session_id, "style_profile": style_profile}
+        session = storage.create_session(session_id, selfie_path, profile)
+        storage.update_outfit(session_id, outfit)
+
+        return {
+            "session_id": session_id,
+            "profile": profile,
+            "outfit": outfit,
+            "selfie_url": session["selfie_url"],
+        }
     except Exception as e:
-        log.error("Analyze failed — session=%s error=%s", session_id, e, exc_info=True)
+        log.error("Analyze failed — %s", e, exc_info=True)
         raise HTTPException(500, str(e))

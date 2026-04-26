@@ -1,20 +1,30 @@
 import OutfitCard from './OutfitCard'
 
-export default function OutfitGrid({ outfit }) {
-  if (!outfit) return null
+const CATEGORY_ORDER = ['Top', 'Bottom', 'Shoes', 'Outerwear']
+
+export default function OutfitGrid({ outfit, loading, onRefresh, onSwap, onTryOn }) {
+  const items = CATEGORY_ORDER.map(cat => outfit[cat]).filter(Boolean)
 
   return (
     <div className="outfit-grid-container">
-      <div className="outfit-concept">
-        {outfit.outfit_concept}
-        {outfit.pieces?.length > 0 && (
-          <span className="piece-count"> — {outfit.pieces.length} pieces</span>
-        )}
+      <div className="outfit-grid-header">
+        <h2 className="outfit-title">Your Outfit</h2>
+        <button className="btn-secondary" onClick={onRefresh} disabled={loading}>
+          {loading ? 'Finding...' : '↺ Regenerate'}
+        </button>
       </div>
       <div className="outfit-grid">
-        {outfit.pieces?.map((piece, i) => (
-          <OutfitCard key={i} piece={piece} />
+        {items.map(item => (
+          <OutfitCard
+            key={item.id}
+            item={item}
+            onSwap={() => onSwap(item.category)}
+            onTryOn={() => onTryOn(item)}
+          />
         ))}
+        {items.length === 0 && (
+          <p className="empty-outfit">No items found. Try regenerating.</p>
+        )}
       </div>
     </div>
   )

@@ -1,11 +1,11 @@
 import asyncio
 import io
 import logging
-import os
+import numpy as np
 
 log = logging.getLogger(__name__)
 
-HF_MODEL = os.environ.get("HF_MODEL", "")
+MODEL_NAME = "patrickjohncyh/fashion-clip"
 
 _model = None
 _processor = None
@@ -33,20 +33,20 @@ _HAIR_LABELS = [
 ]
 
 
-async def _load():
+async def _ensure_loaded():
     global _model, _processor
     if _model is not None:
         return
     async with _load_lock:
         if _model is not None:
             return
-        log.info("Loading FashionCLIP model '%s' — first run may take a moment", HF_MODEL)
+        log.info("Loading FashionCLIP (%s)...", MODEL_NAME)
         import torch
         from transformers import CLIPModel, CLIPProcessor
-        _model = CLIPModel.from_pretrained(HF_MODEL)
-        _processor = CLIPProcessor.from_pretrained(HF_MODEL)
+        _model = CLIPModel.from_pretrained(MODEL_NAME)
+        _processor = CLIPProcessor.from_pretrained(MODEL_NAME)
         _model.eval()
-        log.info("FashionCLIP loaded successfully")
+        log.info("FashionCLIP loaded")
 
 
 def _top_label(image, labels: list[str]) -> str:
@@ -57,30 +57,42 @@ def _top_label(image, labels: list[str]) -> str:
     return labels[int(logits.softmax(dim=1)[0].argmax())]
 
 
-def _run_analysis(image_bytes: bytes) -> str:
+def _analyze_sync(image_bytes: bytes) -> dict:
     from PIL import Image
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-
-    style    = _top_label(image, _STYLE_LABELS)
-    coloring = _top_label(image, _COLORING_LABELS)
-    undertone = _top_label(image, _UNDERTONE_LABELS)
-    build    = _top_label(image, _BUILD_LABELS)
-    hair     = _top_label(image, _HAIR_LABELS)
-
-    log.info("FashionCLIP — style=%s coloring=%s undertone=%s build=%s hair=%s",
-             style, coloring, undertone, build, hair)
-
-    return (
-        f"Style profile (analyzed locally with FashionCLIP — {HF_MODEL}):\n"
-        f"• Skin tone: {coloring} with {undertone}\n"
-        f"• Body type: {build}\n"
-        f"• Hair: {hair}\n"
-        f"• Current style aesthetic: {style}\n\n"
-        "Use these specific attributes to recommend a cohesive outfit that "
-        "flatters and complements this person."
-    )
+    return {
+        "style": _top_label(image, _STYLE_LABELS),
+        "coloring": _top_label(image, _COLORING_LABELS),
+        "undertone": _top_label(image, _UNDERTONE_LABELS),
+        "build": _top_label(image, _BUILD_LABELS),
+        "hair": _top_label(image, _HAIR_LABELS),
+    }
 
 
-async def analyze_selfie_local(image_bytes: bytes) -> str:
-    await _load()
-    return await asyncio.to_thread(_run_analysis, image_bytes)
+def embed_text(text: str) -> np.ndarray:
+    import torch
+    inputs = _processor(text=[text], return_tensors="pt", padding=True)
+    with torch.no_grad():
+        features = _model.get_text_features(**inputs)
+    return features[0].cpu().numpy()
+
+
+def embed_image(pil_image) -> np.ndarray:
+    import torch
+    inputs = _processor(images=pil_image, return_tensors="pt")
+    with torch.no_grad():
+        features = _model.get_image_features(**inputs)
+    return features[0].cpu().numpy()
+
+
+def embed_images_batch(pil_images: list) -> list:
+    import torch
+    inputs = _processor(images=pil_images, return_tensors="pt", padding=True)
+    with torch.no_grad():
+        features = _model.get_image_features(**inputs)
+    return [f.cpu().numpy() for f in features]
+
+
+async def analyze_selfie(image_bytes: bytes) -> dict:
+    await _ensure_loaded()
+    return await asyncio.to_thread(_analyze_sync, image_bytes)

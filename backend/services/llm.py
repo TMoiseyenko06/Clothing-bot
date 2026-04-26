@@ -45,25 +45,25 @@ Rules:
 - First decide the full outfit concept, then choose pieces that match it
 - Leave "link" and "image_url" as empty strings — they are found separately"""
 
-URL_SEARCH_PROMPT = """Search the web for this exact clothing item and return its product page URL and product image URL.
+URL_SEARCH_PROMPT = """USE YOUR WEB SEARCH TOOL RIGHT NOW to find the exact product page for this item.
 
 Brand: {brand}
 Item name: {name}
 Approx price: {price}
 
-Follow these steps:
-1. Search for "{brand} {name}" on the web
-2. Open the result on the brand's own website OR a major retailer (e.g. Nordstrom, ASOS, Zappos, Revolve)
-3. Confirm the page shows ONLY this one product with an Add to Cart button — not a category or search page
-4. Find the main product image: it must be a direct static CDN URL (e.g. ending in .jpg, .jpeg, .png, or .webp)
-   - Look in the page HTML for <img> tags or og:image meta tags
-   - Do NOT return a base64 string, a placeholder, or a URL that redirects to another page
-   - The image URL should contain the product name or a product ID, not generic words like "placeholder" or "noimage"
+You MUST perform a live web search — do not guess or recall from memory.
+
+Step 1: Search the web for: "{brand} {name} buy"
+Step 2: Open the top result from the brand's own website or a major retailer (Nordstrom, ASOS, Zappos, Revolve, etc.)
+Step 3: The page must show THIS ONE specific product with an Add to Cart button.
+         If it is a category page or search results page — keep navigating until you reach the single product page.
+Step 4: Copy the exact URL from the address bar of that single-product page.
+Step 5: Find the direct product image URL from that page (CDN link ending in .jpg, .jpeg, .png, or .webp).
 
 Return ONLY this raw JSON — no markdown, no explanation:
-{{"link": "<exact product page URL>", "image_url": "<direct static image URL>"}}
+{{"link": "<exact single-product page URL you found by searching>", "image_url": "<direct image URL from that page>"}}
 
-If you cannot find both a working product page AND a real image URL, return:
+If after searching you genuinely cannot find the exact single-product page, return:
 {{"link": "", "image_url": ""}}"""
 
 

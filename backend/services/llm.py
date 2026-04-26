@@ -39,14 +39,19 @@ explanation outside the JSON. The JSON must match this exact schema:
 }
 
 Rules:
-- Every piece must be real, in stock, and purchasable today — verify with search
-- The "link" must go directly to the product page, not a search results page
-- The "image_url" must be a direct link to the product image (jpg/png/webp)
+- Every piece must be real, in stock, and purchasable today — search and verify
+- "link" must be the URL of the SINGLE specific product page for that exact item.
+  It must NOT be a category page, collection page, search results page, or homepage.
+  A correct link lands on a page showing only that one product with an "Add to Cart" button.
+  Example of WRONG link: https://www.jcrew.com/mens/category/jackets
+  Example of RIGHT link:  https://www.jcrew.com/p/mens-slim-chino-in-khaki/AH274
+- "image_url" must be a direct CDN/static URL ending in .jpg, .png, or .webp that
+  shows only that product (not a lifestyle or category banner image)
 - All pieces must work together cohesively as a complete outfit
 - Respect the user's budget range strictly
 - Incorporate feedback from previous iterations — do not repeat rejected pieces
 - Always include at minimum: Top, Bottom, Shoes
-- First decide the full outfit concept, then find pieces that match it"""
+- First decide the full outfit concept, then search for each piece individually"""
 
 
 def _clean_json(text: str) -> str:

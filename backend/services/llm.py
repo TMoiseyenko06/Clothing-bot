@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import asyncio
 import base64
 import logging
 from openai import AsyncOpenAI
@@ -17,9 +18,6 @@ OUTFIT_SYSTEM_PROMPT = """You are an expert personal stylist. Your job is to bui
 cohesive outfit for a real person based on their style profile,
 stated preferences, and any feedback from previous outfit attempts.
 
-Search the web to find real, currently available, purchasable clothing items
-with working product page links and direct product image URLs.
-
 ALWAYS return a JSON object only — no markdown, no preamble, no
 explanation outside the JSON. The JSON must match this exact schema:
 
@@ -28,30 +26,43 @@ explanation outside the JSON. The JSON must match this exact schema:
   "pieces": [
     {
       "category": "Top | Bottom | Shoes | Outerwear | Accessory",
-      "name": "string",
-      "brand": "string",
-      "price": "string",
-      "link": "string — direct URL to the product page",
-      "image_url": "string — direct URL to the product image",
+      "name": "string — specific product name",
+      "brand": "string — real brand name",
+      "price": "string — approximate retail price e.g. $89",
+      "link": "",
+      "image_url": "",
       "why": "string — one short sentence (under 15 words) why this works for this person"
     }
   ]
 }
 
 Rules:
-- Every piece must be real, in stock, and purchasable today — search and verify
-- "link" must be the URL of the SINGLE specific product page for that exact item.
-  It must NOT be a category page, collection page, search results page, or homepage.
-  A correct link lands on a page showing only that one product with an "Add to Cart" button.
-  Example of WRONG link: https://www.jcrew.com/mens/category/jackets
-  Example of RIGHT link:  https://www.jcrew.com/p/mens-slim-chino-in-khaki/AH274
-- "image_url" must be a direct CDN/static URL ending in .jpg, .png, or .webp that
-  shows only that product (not a lifestyle or category banner image)
+- Choose real brands and specific product names that exist and are available online
 - All pieces must work together cohesively as a complete outfit
 - Respect the user's budget range strictly
 - Incorporate feedback from previous iterations — do not repeat rejected pieces
 - Always include at minimum: Top, Bottom, Shoes
-- First decide the full outfit concept, then search for each piece individually"""
+- First decide the full outfit concept, then choose pieces that match it
+- Leave "link" and "image_url" as empty strings — they are found separately"""
+
+URL_SEARCH_PROMPT = """Search the web for this exact clothing item and find its product page.
+
+Brand: {brand}
+Item name: {name}
+Approx price: {price}
+
+Steps you must follow:
+1. Search for "{brand} {name} buy" on the web
+2. Find the listing on the brand's own website OR a major retailer (Nordstrom, ASOS, Zappos, etc.)
+3. Click through to the specific individual product page — the page must show ONLY this one item
+4. Confirm the page has an Add to Cart or Buy button
+5. Find the main product image URL directly from the page (a CDN/static image URL)
+
+Return ONLY this raw JSON — no markdown, no explanation:
+{{"link": "<exact product page URL>", "image_url": "<direct image URL ending in .jpg .png or .webp>"}}
+
+If you cannot find the exact individual product page, return:
+{{"link": "", "image_url": ""}}"""
 
 
 def _clean_json(text: str) -> str:
@@ -66,7 +77,7 @@ def _repair_truncated_json(text: str) -> dict | None:
     depth = 0
     in_string = False
     escape_next = False
-    last_piece_end = -1  # char index where depth last fell back to 2 (piece closed)
+    last_piece_end = -1
 
     for i, ch in enumerate(text):
         if escape_next:
@@ -86,14 +97,12 @@ def _repair_truncated_json(text: str) -> dict | None:
             depth += 1
         elif ch in ("}", "]"):
             depth -= 1
-            # depth 3→2 means a piece object just closed inside the pieces array
             if prev == 3 and depth == 2:
                 last_piece_end = i
 
     if last_piece_end < 0:
         return None
 
-    # Strip trailing comma after the last complete piece, then close the structure
     partial = text[: last_piece_end + 1].rstrip().rstrip(",")
     candidate = partial + "\n  ]\n}"
     try:
@@ -102,6 +111,36 @@ def _repair_truncated_json(text: str) -> dict | None:
         return result
     except json.JSONDecodeError:
         return None
+
+
+async def _find_urls_for_piece(piece: dict) -> dict:
+    """Dedicated per-piece search call to find the exact product URL and image."""
+    prompt = URL_SEARCH_PROMPT.format(
+        brand=piece.get("brand", ""),
+        name=piece.get("name", ""),
+        price=piece.get("price", ""),
+    )
+    try:
+        response = await client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=256,
+        )
+        raw = response.choices[0].message.content
+        data = json.loads(_clean_json(raw))
+        if data.get("link"):
+            piece["link"] = data["link"]
+            log.info("URL found for '%s %s': %s", piece.get("brand"), piece.get("name"), data["link"])
+        if data.get("image_url"):
+            piece["image_url"] = data["image_url"]
+    except Exception as e:
+        log.warning("URL search failed for '%s %s': %s", piece.get("brand"), piece.get("name"), e)
+    return piece
+
+
+async def enrich_pieces_with_urls(pieces: list) -> list:
+    """Run one dedicated URL-search call per piece, all in parallel."""
+    return list(await asyncio.gather(*[_find_urls_for_piece(p) for p in pieces]))
 
 
 async def analyze_selfie(image_bytes: bytes, content_type: str) -> str:
@@ -191,13 +230,11 @@ async def generate_outfit(
         if finish_reason == "length":
             log.warning("Response truncated (finish_reason=length) on attempt %d", attempt + 1)
 
-        # Try clean parse first
         try:
             return json.loads(cleaned)
         except json.JSONDecodeError:
             pass
 
-        # Try to repair a truncated response before retrying
         repaired = _repair_truncated_json(cleaned)
         if repaired and repaired.get("pieces"):
             return repaired

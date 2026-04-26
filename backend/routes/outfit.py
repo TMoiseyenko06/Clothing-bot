@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from services.llm import generate_outfit
+from services.llm import generate_outfit, enrich_pieces_with_urls
 from services import storage
 
 router = APIRouter()
@@ -35,14 +35,14 @@ def _shopping_fallback(brand: str, name: str) -> str:
 
 
 async def _validate_piece(piece: dict) -> dict:
-    """Check the model-provided link; replace broken ones with a Google Shopping search."""
+    """HEAD-check the link; replace broken ones with a Google Shopping search."""
     brand = piece.get("brand", "")
     name = piece.get("name", "")
     link = piece.get("link", "").strip()
 
     if not link:
         piece["link"] = _shopping_fallback(brand, name)
-        log.info("No link provided for '%s' — using Google Shopping fallback", name)
+        log.info("No link for '%s' — using Google Shopping fallback", name)
         return piece
 
     try:
@@ -93,7 +93,11 @@ async def generate(payload: GeneratePayload):
                   payload.session_id, iteration, e, exc_info=True)
         raise HTTPException(500, str(e))
 
-    # Validate all links in parallel; swap out broken ones for Google Shopping search URLs
+    # Step 2: dedicated per-piece search for exact product URL + image
+    log.info("Searching for exact product URLs for %d pieces...", len(outfit.get("pieces", [])))
+    outfit["pieces"] = await enrich_pieces_with_urls(outfit.get("pieces", []))
+
+    # Step 3: validate links; replace any still-broken ones with Google Shopping fallback
     outfit["pieces"] = list(
         await asyncio.gather(*[_validate_piece(p) for p in outfit.get("pieces", [])])
     )

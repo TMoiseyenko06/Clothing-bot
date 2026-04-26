@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from services.llm import generate_outfit, enrich_pieces_with_urls
+from services.scraper import scrape_product_image
 from services import storage
 
 router = APIRouter()
@@ -26,6 +27,17 @@ class GeneratePayload(BaseModel):
     session_id: str
     onboarding: Optional[OnboardingPayload] = None
     feedback: Optional[FeedbackPayload] = None
+
+
+async def _fill_missing_image(piece: dict) -> dict:
+    """If a piece has a link but no image, scrape the product page for og:image."""
+    if piece.get("image_url") or not piece.get("link"):
+        return piece
+    img = await scrape_product_image(piece["link"])
+    if img:
+        piece["image_url"] = img
+        log.info("Scraped image for '%s': %s", piece.get("name"), img)
+    return piece
 
 
 @router.post("/outfit/generate")
@@ -62,6 +74,11 @@ async def generate(payload: GeneratePayload):
 
     # Per-piece search for exact product URL + image
     outfit["pieces"] = await enrich_pieces_with_urls(outfit.get("pieces", []))
+
+    # Scrape product page for any piece that has a link but no image
+    outfit["pieces"] = list(
+        await asyncio.gather(*[_fill_missing_image(p) for p in outfit["pieces"]])
+    )
 
     updated_session = await asyncio.to_thread(
         storage.save_outfit, payload.session_id, outfit, feedback_dict

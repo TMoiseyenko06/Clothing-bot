@@ -3,7 +3,10 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
+from services import logbuffer
 from routes import analyze, outfit, history
+
+logbuffer.setup()
 
 app = FastAPI(title="AI Outfit Builder")
 

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -6,6 +7,7 @@ from services.llm import generate_outfit
 from services import storage
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 
 class OnboardingPayload(BaseModel):
@@ -39,19 +41,26 @@ async def generate(payload: GeneratePayload):
     onboarding = session.get("onboarding") or {}
     feedback_dict = payload.feedback.model_dump() if payload.feedback else None
 
-    # Include the incoming feedback in generation context so the model sees
-    # what the user thought of the most recent outfit
     existing_feedbacks = session.get("feedbacks", [])
     feedbacks_for_generation = existing_feedbacks + ([feedback_dict] if feedback_dict else [])
+    iteration = len(session.get("outfits", [])) + 1
 
-    outfit = await generate_outfit(
-        style_profile=session["style_profile"],
-        onboarding=onboarding,
-        previous_outfits=session.get("outfits", []),
-        feedbacks=feedbacks_for_generation,
-    )
+    log.info("Generating outfit #%d — session=%s", iteration, payload.session_id)
 
-    # Run blocking image-cache I/O in a thread
+    try:
+        outfit = await generate_outfit(
+            style_profile=session["style_profile"],
+            onboarding=onboarding,
+            previous_outfits=session.get("outfits", []),
+            feedbacks=feedbacks_for_generation,
+        )
+        log.info("Outfit #%d generated — concept=%s pieces=%d",
+                 iteration, outfit.get("outfit_concept", "?"), len(outfit.get("pieces", [])))
+    except Exception as e:
+        log.error("Outfit generation failed — session=%s iteration=%d error=%s",
+                  payload.session_id, iteration, e, exc_info=True)
+        raise HTTPException(500, str(e))
+
     updated_session = await asyncio.to_thread(
         storage.save_outfit, payload.session_id, outfit, feedback_dict
     )

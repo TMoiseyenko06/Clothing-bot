@@ -1,7 +1,12 @@
 from fastapi import APIRouter, HTTPException
-from services import storage
+from services import storage, logbuffer
 
 router = APIRouter()
+
+
+@router.get("/logs")
+async def get_logs():
+    return logbuffer.get_logs()
 
 
 @router.get("/sessions")

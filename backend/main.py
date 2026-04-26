@@ -26,6 +26,7 @@ app.include_router(tryon.router, prefix="/api")
 
 OUTFITS_DIR = Path(os.environ.get("OUTFITS_DIR", "./outfits"))
 CATALOG_DIR = Path(os.environ.get("CATALOG_DIR", "./catalog"))
+FRONTEND_DIST = Path(os.environ.get("FRONTEND_DIST", ""))
 OUTFITS_DIR.mkdir(parents=True, exist_ok=True)
 CATALOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -36,3 +37,8 @@ app.mount("/catalog", StaticFiles(directory=str(CATALOG_DIR)), name="catalog")
 @app.get("/api/logs")
 def get_logs():
     return logbuffer.get_logs()
+
+
+# Serve built React app — must be last so API routes take priority
+if FRONTEND_DIST and FRONTEND_DIST.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="spa")

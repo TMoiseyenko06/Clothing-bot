@@ -45,21 +45,33 @@ def _build_index():
     global _index, _meta
     import faiss
     from datasets import load_dataset
-    from services.fashionclip import embed_images_batch
+    from services.fashionclip import embed_images_batch, embed_text
 
     CATALOG_DIR.mkdir(parents=True, exist_ok=True)
     images_dir = CATALOG_DIR / "images"
     images_dir.mkdir(exist_ok=True)
 
-    log.info("Downloading fashion-product-images dataset...")
-    ds = load_dataset("ashraq/fashion-product-images-small", split="train")
+    log.info("Downloading nreimers/fashion-dataset...")
+    ds = load_dataset("nreimers/fashion-dataset", split="train")
+
+    cols = ds.column_names
+    log.info("Dataset columns: %s", cols)
+    log.info("Sample row: %s", {k: str(ds[0][k])[:80] for k in cols})
 
     total = len(ds)
     if MAX_ITEMS and MAX_ITEMS < total:
         total = MAX_ITEMS
         ds = ds.select(range(total))
 
-    log.info("Indexing %d product images...", total)
+    log.info("Indexing %d items...", total)
+
+    has_images = "image" in cols
+
+    # Detect field names flexibly
+    desc_col  = next((c for c in ["description", "name", "title", "text", "productDisplayName"] if c in cols), None)
+    cat_col   = next((c for c in ["category", "articleType", "subCategory", "label", "type"] if c in cols), None)
+    gender_col = next((c for c in ["gender", "Gender"] if c in cols), None)
+    img_url_col = next((c for c in ["image_url", "imageUrl", "img_url", "url"] if c in cols), None)
 
     meta = []
     all_embeddings = []
@@ -68,38 +80,44 @@ def _build_index():
     for start in range(0, total, batch_size):
         end = min(start + batch_size, total)
         batch = ds[start:end]
+        n = end - start
 
-        pil_images = batch["image"]
-        names        = batch.get("productDisplayName", [""] * len(pil_images))
-        article_types = batch.get("articleType",       [""] * len(pil_images))
-        sub_cats      = batch.get("subCategory",       [""] * len(pil_images))
-        master_cats   = batch.get("masterCategory",    [""] * len(pil_images))
-        genders       = batch.get("gender",            [""] * len(pil_images))
-        colours       = batch.get("baseColour",        [""] * len(pil_images))
-        usages        = batch.get("usage",             [""] * len(pil_images))
+        descs   = batch[desc_col]   if desc_col   else [""] * n
+        cats    = batch[cat_col]    if cat_col    else [""] * n
+        genders = batch[gender_col] if gender_col else [""] * n
 
-        embs = embed_images_batch(pil_images)
+        if has_images:
+            pil_images = batch["image"]
+            embs = embed_images_batch(pil_images)
+        else:
+            # Text-only dataset — embed the description
+            embs = [embed_text(str(d)) for d in descs]
+
         all_embeddings.extend(embs)
 
-        for i, img in enumerate(pil_images):
+        for i in range(n):
             img_path = images_dir / f"{start + i}.jpg"
-            img.convert("RGB").save(img_path, quality=85)
 
-            article = str(article_types[i]) if article_types[i] else ""
-            sub     = str(sub_cats[i])      if sub_cats[i]      else ""
-            master  = str(master_cats[i])   if master_cats[i]   else ""
-            norm_cat = _normalize_category(article, sub, master)
+            if has_images:
+                batch["image"][i].convert("RGB").save(img_path, quality=85)
+                img_url = f"/catalog/images/{start + i}.jpg"
+            elif img_url_col and batch[img_url_col][i]:
+                img_url = batch[img_url_col][i]  # external URL
+            else:
+                img_url = ""
 
-            desc_parts = [p for p in [names[i], colours[i], usages[i]] if p]
-            desc = " · ".join(str(p) for p in desc_parts)[:200]
+            cat_raw = str(cats[i]) if cats[i] else ""
+            norm_cat = _normalize_category(cat_raw, "", "")
+
+            desc = str(descs[i])[:200] if descs[i] else ""
 
             meta.append({
                 "id": str(start + i),
                 "description": desc,
                 "category": norm_cat or "Top",
-                "article_type": article,
+                "article_type": cat_raw,
                 "gender": str(genders[i]) if genders[i] else "",
-                "image_url": f"/catalog/images/{start + i}.jpg",
+                "image_url": img_url,
             })
 
         if start % (batch_size * 10) == 0:
@@ -121,18 +139,18 @@ def _build_index():
 
 
 def _normalize_category(article: str, sub: str, master: str) -> str | None:
-    a, s, m = article.lower(), sub.lower(), master.lower()
+    combined = (article + " " + sub + " " + master).lower()
 
-    if m == "footwear" or s == "shoes" or any(w in a for w in ["shoes", "sneaker", "boot", "heel", "sandal", "loafer", "flip flop", "moccasin"]):
+    if any(w in combined for w in ["shoe", "sneaker", "boot", "heel", "sandal", "loafer", "footwear", "flip flop", "moccasin"]):
         return "Shoes"
 
-    if any(w in a for w in ["jacket", "coat", "blazer", "windcheater", "overcoat", "parka", "cardigan"]):
+    if any(w in combined for w in ["jacket", "coat", "blazer", "windcheater", "overcoat", "parka", "outerwear"]):
         return "Outerwear"
 
-    if s == "bottomwear" or any(w in a for w in ["trouser", "jean", "skirt", "short", "pant", "legging", "capri", "jogger"]):
+    if any(w in combined for w in ["trouser", "jean", "skirt", "short", "pant", "legging", "capri", "jogger", "bottomwear"]):
         return "Bottom"
 
-    if s == "topwear" or any(w in a for w in ["shirt", "t-shirt", "tshirt", "top", "blouse", "sweater", "sweatshirt", "hoodie", "kurta", "polo", "vest", "tunic", "dress", "jumpsuit"]):
+    if any(w in combined for w in ["shirt", "t-shirt", "tshirt", "top", "blouse", "sweater", "sweatshirt", "hoodie", "polo", "vest", "tunic", "dress", "jumpsuit", "topwear"]):
         return "Top"
 
     return None

@@ -40,11 +40,13 @@ async def _ensure_loaded():
     async with _load_lock:
         if _model is not None:
             return
-        log.info("Loading FashionCLIP (%s)...", MODEL_NAME)
-        import torch
+        log.info("Downloading FashionCLIP weights (~600 MB) — this only happens once...")
+        import warnings, torch
         from transformers import CLIPModel, CLIPProcessor
-        _model = CLIPModel.from_pretrained(MODEL_NAME)
-        _processor = CLIPProcessor.from_pretrained(MODEL_NAME)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            _model = CLIPModel.from_pretrained(MODEL_NAME)
+            _processor = CLIPProcessor.from_pretrained(MODEL_NAME)
         _model.eval()
         log.info("FashionCLIP loaded")
 

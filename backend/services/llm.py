@@ -74,29 +74,48 @@ Return ONLY this JSON (no markdown, no explanation):
 {{"link": "https://...", "image_url": "https://..."}}"""
 
 
-def _repair_truncated_json(text: str) -> dict | None:
-    """Close truncated JSON by tracking brace/bracket depth."""
+def _extract_json(text: str) -> dict | None:
+    """Try every strategy to pull a valid JSON object out of `text`."""
+    # 1. Direct parse
     try:
         return json.loads(text)
     except Exception:
         pass
+
+    # 2. Strip markdown fences
+    stripped = re.sub(r"^```(?:json)?\s*", "", text.strip())
+    stripped = re.sub(r"\s*```$", "", stripped)
+    try:
+        return json.loads(stripped)
+    except Exception:
+        pass
+
+    # 3. Find the outermost {...} block (model may add preamble/postamble)
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end > start:
+        try:
+            return json.loads(text[start:end + 1])
+        except Exception:
+            pass
+
+    # 4. Repair truncated JSON by closing at the last complete piece
     depth = 0
     last_piece_close = -1
     for i, ch in enumerate(text):
-        if ch == '{':
+        if ch == "{":
             depth += 1
-        elif ch == '}':
+        elif ch == "}":
             depth -= 1
             if depth == 2:
                 last_piece_close = i
-    if last_piece_close == -1:
-        return None
-    truncated = text[:last_piece_close + 1]
-    candidate = truncated + "]}"
-    try:
-        return json.loads(candidate)
-    except Exception:
-        return None
+    if last_piece_close != -1:
+        try:
+            return json.loads(text[:last_piece_close + 1] + "]}")
+        except Exception:
+            pass
+
+    return None
 
 
 def _build_style_string(profile: dict) -> str:
@@ -136,22 +155,34 @@ async def generate_outfit(style_profile: str, previous_outfits: list, feedbacks:
             resp = await client.chat.completions.create(
                 model=MODEL,
                 messages=[{"role": "system", "content": OUTFIT_SYSTEM_PROMPT}] + messages,
-                max_tokens=2048,
+                max_tokens=3000,
                 temperature=0.8,
             )
-            raw = resp.choices[0].message.content.strip()
-            raw = re.sub(r"^```(?:json)?\s*", "", raw)
-            raw = re.sub(r"\s*```$", "", raw)
+            choice = resp.choices[0]
+            raw = (choice.message.content or "").strip()
 
-            try:
-                return json.loads(raw)
-            except Exception:
-                repaired = _repair_truncated_json(raw)
-                if repaired:
-                    return repaired
-                log.warning("Attempt %d: invalid JSON, retrying", attempt + 1)
+            # The :online model sometimes returns content via tool_calls rather than
+            # message.content; collect any text parts from tool_call results too.
+            if not raw and hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
+                parts = []
+                for tc in choice.message.tool_calls:
+                    if hasattr(tc, "function") and tc.function.arguments:
+                        parts.append(tc.function.arguments)
+                raw = " ".join(parts)
+
+            log.debug("Attempt %d raw response (%d chars): %.500s", attempt + 1, len(raw), raw)
+
+            if not raw:
+                log.warning("Attempt %d: empty response from model", attempt + 1)
+                continue
+
+            result = _extract_json(raw)
+            if result and result.get("pieces"):
+                return result
+
+            log.warning("Attempt %d: could not extract valid outfit JSON. Raw snippet: %.300s", attempt + 1, raw)
         except Exception as e:
-            log.error("Outfit generation attempt %d failed: %s", attempt + 1, e)
+            log.error("Outfit generation attempt %d failed: %s", attempt + 1, e, exc_info=True)
             if attempt == 2:
                 raise
 
@@ -169,17 +200,19 @@ async def _find_urls_for_piece(piece: dict) -> dict:
         resp = await client.chat.completions.create(
             model=MODEL,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=256,
+            max_tokens=512,
             temperature=0,
         )
-        raw = resp.choices[0].message.content.strip()
-        raw = re.sub(r"^```(?:json)?\s*", "", raw)
-        raw = re.sub(r"\s*```$", "", raw)
-        urls = json.loads(raw)
-        if urls.get("link"):
-            piece["link"] = urls["link"]
-        if urls.get("image_url"):
-            piece["image_url"] = urls["image_url"]
+        raw = (resp.choices[0].message.content or "").strip()
+        log.debug("URL search raw for '%s': %.300s", piece.get("name"), raw)
+        urls = _extract_json(raw) or {}
+        link = urls.get("link", "")
+        image_url = urls.get("image_url", "")
+        # Reject bare search URLs — only accept direct product or Shopping listing pages
+        if link and "google.com/search" not in link:
+            piece["link"] = link
+        if image_url:
+            piece["image_url"] = image_url
     except Exception as e:
         log.warning("URL search failed for '%s': %s", piece.get("name"), e)
     return piece

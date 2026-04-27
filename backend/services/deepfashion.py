@@ -25,10 +25,10 @@ async def _ensure_loaded():
         if _index is not None:
             return
         if _INDEX_FILE.exists() and _META_FILE.exists():
-            log.info("Loading DeepFashion index from disk...")
+            log.info("Loading catalog index from disk...")
             await asyncio.to_thread(_load_from_disk)
         else:
-            log.info("Building DeepFashion index — first run may take several minutes...")
+            log.info("Building catalog index — first run may take several minutes...")
             await asyncio.to_thread(_build_index)
 
 
@@ -38,7 +38,7 @@ def _load_from_disk():
     _index = faiss.read_index(str(_INDEX_FILE))
     with open(_META_FILE) as f:
         _meta = json.load(f)
-    log.info("Loaded %d items from DeepFashion index", len(_meta))
+    log.info("Loaded %d items from catalog index", len(_meta))
 
 
 def _build_index():
@@ -51,15 +51,15 @@ def _build_index():
     images_dir = CATALOG_DIR / "images"
     images_dir.mkdir(exist_ok=True)
 
-    log.info("Downloading Marqo/deepfashion-multimodal dataset...")
-    ds = load_dataset("Marqo/deepfashion-multimodal", split="data")
+    log.info("Downloading fashion-product-images dataset...")
+    ds = load_dataset("ashraq/fashion-product-images-small", split="train")
 
     total = len(ds)
     if MAX_ITEMS and MAX_ITEMS < total:
         total = MAX_ITEMS
         ds = ds.select(range(total))
 
-    log.info("Indexing %d items...", total)
+    log.info("Indexing %d product images...", total)
 
     meta = []
     all_embeddings = []
@@ -70,22 +70,35 @@ def _build_index():
         batch = ds[start:end]
 
         pil_images = batch["image"]
-        item_ids = batch.get("item_id", [str(i) for i in range(start, end)])
-        descriptions = batch.get("description", batch.get("text", [""] * len(pil_images)))
-        categories = batch.get("category", [""] * len(pil_images))
+        names        = batch.get("productDisplayName", [""] * len(pil_images))
+        article_types = batch.get("articleType",       [""] * len(pil_images))
+        sub_cats      = batch.get("subCategory",       [""] * len(pil_images))
+        master_cats   = batch.get("masterCategory",    [""] * len(pil_images))
+        genders       = batch.get("gender",            [""] * len(pil_images))
+        colours       = batch.get("baseColour",        [""] * len(pil_images))
+        usages        = batch.get("usage",             [""] * len(pil_images))
 
         embs = embed_images_batch(pil_images)
         all_embeddings.extend(embs)
 
-        for i, (img, item_id, desc, cat) in enumerate(zip(pil_images, item_ids, descriptions, categories)):
+        for i, img in enumerate(pil_images):
             img_path = images_dir / f"{start + i}.jpg"
             img.convert("RGB").save(img_path, quality=85)
-            norm_cat = _normalize_category(str(cat))
+
+            article = str(article_types[i]) if article_types[i] else ""
+            sub     = str(sub_cats[i])      if sub_cats[i]      else ""
+            master  = str(master_cats[i])   if master_cats[i]   else ""
+            norm_cat = _normalize_category(article, sub, master)
+
+            desc_parts = [p for p in [names[i], colours[i], usages[i]] if p]
+            desc = " · ".join(str(p) for p in desc_parts)[:200]
+
             meta.append({
                 "id": str(start + i),
-                "item_id": str(item_id),
-                "description": str(desc)[:200] if desc else "",
+                "description": desc,
                 "category": norm_cat or "Top",
+                "article_type": article,
+                "gender": str(genders[i]) if genders[i] else "",
                 "image_url": f"/catalog/images/{start + i}.jpg",
             })
 
@@ -104,19 +117,24 @@ def _build_index():
 
     _index = index
     _meta = meta
-    log.info("DeepFashion index built: %d items", len(meta))
+    log.info("Catalog index built: %d items", len(meta))
 
 
-def _normalize_category(raw: str) -> str | None:
-    raw = raw.lower()
-    if any(w in raw for w in ["shoe", "sneaker", "boot", "heel", "sandal", "loafer"]):
+def _normalize_category(article: str, sub: str, master: str) -> str | None:
+    a, s, m = article.lower(), sub.lower(), master.lower()
+
+    if m == "footwear" or s == "shoes" or any(w in a for w in ["shoes", "sneaker", "boot", "heel", "sandal", "loafer", "flip flop", "moccasin"]):
         return "Shoes"
-    if any(w in raw for w in ["coat", "outerwear", "cardigan"]):
+
+    if any(w in a for w in ["jacket", "coat", "blazer", "windcheater", "overcoat", "parka", "cardigan"]):
         return "Outerwear"
-    if any(w in raw for w in ["pant", "jean", "skirt", "short", "trouser", "legging"]):
+
+    if s == "bottomwear" or any(w in a for w in ["trouser", "jean", "skirt", "short", "pant", "legging", "capri", "jogger"]):
         return "Bottom"
-    if any(w in raw for w in ["jacket", "blazer", "shirt", "blouse", "top", "sweater", "tee", "hoodie", "dress", "romper"]):
+
+    if s == "topwear" or any(w in a for w in ["shirt", "t-shirt", "tshirt", "top", "blouse", "sweater", "sweatshirt", "hoodie", "kurta", "polo", "vest", "tunic", "dress", "jumpsuit"]):
         return "Top"
+
     return None
 
 
@@ -132,21 +150,23 @@ async def swap_item(profile: dict, category: str, exclude_id: str | None = None)
 
 def _build_query(profile: dict) -> str:
     gender = profile.get("gender", "")
-    style = profile.get("style_pref") or profile.get("style", "casual")
-    build = profile.get("build", "average")
-    coloring = profile.get("coloring", "medium")
-    return f"{gender} {style} clothing for {build} person with {coloring} complexion".strip()
+    style  = profile.get("style_pref") or "casual"
+    build  = profile.get("build", "")
+    colour = profile.get("coloring", "")
+    return f"{gender} {style} {colour} {build} fashion clothing apparel".strip()
 
 
 def _search_outfit_sync(profile: dict) -> dict:
     import faiss
     from services.fashionclip import embed_text
 
+    gender_filter = profile.get("gender", "unisex").lower()
+
     query = _build_query(profile)
     q_vec = embed_text(query).reshape(1, -1).astype("float32")
     faiss.normalize_L2(q_vec)
 
-    k = min(300, len(_meta))
+    k = min(500, len(_meta))
     D, I = _index.search(q_vec, k)
 
     outfit = {}
@@ -155,8 +175,11 @@ def _search_outfit_sync(profile: dict) -> dict:
             continue
         item = _meta[idx]
         cat = item["category"]
-        if cat not in outfit:
-            outfit[cat] = {**item}
+        if cat in outfit:
+            continue
+        if not _gender_match(item.get("gender", ""), gender_filter):
+            continue
+        outfit[cat] = {**item}
         if len(outfit) >= 4:
             break
 
@@ -167,21 +190,39 @@ def _search_category_sync(profile: dict, category: str, exclude_id: str | None) 
     import faiss
     from services.fashionclip import embed_text
 
-    query = f"{profile.get('style', 'casual')} {category.lower()}"
+    gender_filter = profile.get("gender", "unisex").lower()
+    style = profile.get("style_pref", "casual")
+    query = f"{gender_filter} {style} {category.lower()}"
     q_vec = embed_text(query).reshape(1, -1).astype("float32")
     faiss.normalize_L2(q_vec)
 
-    k = min(200, len(_meta))
+    k = min(300, len(_meta))
     D, I = _index.search(q_vec, k)
 
     for idx in I[0]:
         if idx < 0:
             continue
         item = _meta[idx]
-        if item["category"] == category and item["id"] != exclude_id:
-            return {**item}
+        if item["category"] != category or item["id"] == exclude_id:
+            continue
+        if not _gender_match(item.get("gender", ""), gender_filter):
+            continue
+        return {**item}
 
     return None
+
+
+def _gender_match(item_gender: str, requested: str) -> bool:
+    if requested in ("unisex", ""):
+        return True
+    ig = item_gender.lower()
+    if ig in ("unisex", ""):
+        return True
+    if requested == "men" and ig in ("men", "boys"):
+        return True
+    if requested == "women" and ig in ("women", "girls"):
+        return True
+    return False
 
 
 def get_item_image_path(item_id: str) -> Path | None:

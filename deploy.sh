@@ -9,7 +9,7 @@ if [ -f "$ROOT/.env" ]; then
   set -a; source "$ROOT/.env"; set +a
 fi
 
-PORT="${PORT:-8000}"
+PORT="${PORT:-6006}"
 
 # Install Node.js if missing (Vast.ai instances don't include it)
 if ! command -v npm &>/dev/null; then

@@ -1,10 +1,11 @@
 const BASE = '/api'
 
-export async function analyzeSelfie(file, gender = 'unisex', stylePref = 'casual') {
+export async function analyzeSelfie(file, gender = 'unisex', stylePref = 'casual', budget = 'midrange') {
   const form = new FormData()
   form.append('file', file)
   form.append('gender', gender)
   form.append('style_pref', stylePref)
+  form.append('budget', budget)
   const res = await fetch(`${BASE}/analyze`, { method: 'POST', body: form })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))

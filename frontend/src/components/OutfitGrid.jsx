@@ -1,6 +1,6 @@
 import OutfitCard from './OutfitCard'
 
-export default function OutfitGrid({ outfit, generating, onRegenerate }) {
+export default function OutfitGrid({ outfit, generating }) {
   if (generating) {
     return (
       <div className="loading" style={{ minHeight: 320 }}>
@@ -23,9 +23,6 @@ export default function OutfitGrid({ outfit, generating, onRegenerate }) {
             <p className="outfit-concept">{outfit.outfit_concept}</p>
           )}
         </div>
-        <button className="btn-secondary" onClick={onRegenerate}>
-          ↺ Regenerate
-        </button>
       </div>
       <div className="outfit-grid">
         {pieces.map((piece, i) => (

@@ -25,12 +25,18 @@ You are an expert personal stylist. Your job has TWO parts:
 
 PART 1 — Design the outfit:
 Create a cohesive outfit concept for the client based on their style profile.
-Choose REAL, currently-sold products from well-known brands (e.g. Levi's, Zara, Nike, Mango, ASOS, H&M, Uniqlo, Ralph Lauren, etc.).
+Choose REAL, currently-sold products from well-known brands.
 Pick items that actually exist in the market right now — specific product names, not made-up names.
+
+BUDGET RULES — you MUST follow the price range stated in the style profile. Every single piece must
+fall within the stated budget. Do not exceed the per-item limit under any circumstances.
+  budget    → each item must be under $50  (e.g. H&M, Zara, ASOS, Uniqlo, Target, Primark)
+  midrange  → each item must be $50–$150   (e.g. Levi's, Nike, Mango, Tommy Hilfiger, Gap)
+  premium   → each item must be $150–$300  (e.g. A.P.C., Rag & Bone, AllSaints, Ted Baker)
+  luxury    → $300+ is fine               (e.g. Loro Piana, Brunello Cucinelli, Brioni)
 
 PART 2 — Product URLs (handled separately after you respond):
 Do NOT search for URLs yet. Leave "link" and "image_url" as empty strings.
-A separate step will search for exact product pages for each item you name.
 
 Generate exactly 4 pieces: one Top, one Bottom, one Shoes, one Outerwear.
 Return ONLY valid JSON — no markdown fences, no commentary, nothing else.
@@ -118,21 +124,27 @@ def _extract_json(text: str) -> dict | None:
     return None
 
 
+_BUDGET_LABELS = {
+    "budget":   "Budget — every item must be under $50",
+    "midrange": "Mid-range — every item must be $50–$150",
+    "premium":  "Premium — every item must be $150–$300",
+    "luxury":   "Luxury — $300+ per item is fine",
+}
+
+
 def _build_style_string(profile: dict) -> str:
-    gender = profile.get("gender", "")
-    style_pref = profile.get("style_pref", "")
-    coloring = profile.get("coloring", "")
-    undertone = profile.get("undertone", "")
-    build = profile.get("build", "")
-    hair = profile.get("hair", "")
+    budget_key = profile.get("budget", "midrange")
+    budget_line = _BUDGET_LABELS.get(budget_key, _BUDGET_LABELS["midrange"])
     return (
         f"Style Profile:\n"
-        f"• Gender: {gender}\n"
-        f"• Style preference: {style_pref}\n"
-        f"• Skin tone: {coloring} with {undertone}\n"
-        f"• Body type: {build}\n"
-        f"• Hair: {hair}\n\n"
-        f"Recommend a complete outfit that flatters and matches this profile."
+        f"• Gender: {profile.get('gender', '')}\n"
+        f"• Style preference: {profile.get('style_pref', '')}\n"
+        f"• Budget: {budget_line}\n"
+        f"• Skin tone: {profile.get('coloring', '')} with {profile.get('undertone', '')}\n"
+        f"• Body type: {profile.get('build', '')}\n"
+        f"• Hair: {profile.get('hair', '')}\n\n"
+        f"Recommend a complete outfit that flatters and matches this profile. "
+        f"Strictly respect the budget — do not suggest items outside the stated price range."
     )
 
 

@@ -5,21 +5,25 @@ import OutfitGrid from './components/OutfitGrid'
 import { analyzeSelfie, generateOutfit } from './api'
 import './index.css'
 
+const RATING_LABELS = { 1: 'Hate it', 2: 'Not great', 3: 'OK', 4: 'Like it', 5: 'Love it' }
+
 export default function App() {
   const [session, setSession] = useState(null)
   const [outfit, setOutfit] = useState(null)
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState(null)
-  const [showFeedback, setShowFeedback] = useState(false)
-  const [feedback, setFeedback] = useState({ rating: 3, text: '' })
+  const [rating, setRating] = useState(0)
+  const [feedbackText, setFeedbackText] = useState('')
 
-  const handleSelfie = async (file, gender, stylePref) => {
+  const handleSelfie = async (file, gender, stylePref, budget) => {
     setLoading(true)
     setError(null)
     setOutfit(null)
+    setRating(0)
+    setFeedbackText('')
     try {
-      const result = await analyzeSelfie(file, gender, stylePref)
+      const result = await analyzeSelfie(file, gender, stylePref, budget)
       setSession(result)
       setGenerating(true)
       const gen = await generateOutfit(result.session_id)
@@ -32,14 +36,15 @@ export default function App() {
     }
   }
 
-  const handleRegenerate = async (fb = null) => {
+  const handleRegenerate = async () => {
     setGenerating(true)
     setError(null)
-    setShowFeedback(false)
+    const feedback = rating > 0 ? { rating, text: feedbackText.trim() } : null
     try {
-      const gen = await generateOutfit(session.session_id, fb)
+      const gen = await generateOutfit(session.session_id, feedback)
       setOutfit(gen.outfit)
-      setFeedback({ rating: 3, text: '' })
+      setRating(0)
+      setFeedbackText('')
     } catch (e) {
       setError(e.message || 'Generation failed')
     } finally {
@@ -75,43 +80,42 @@ export default function App() {
       <main className="main">
         <StyleProfile profile={session.profile} selfieUrl={session.selfie_url} />
         {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
-        <OutfitGrid
-          outfit={outfit}
-          generating={generating}
-          onRegenerate={() => setShowFeedback(true)}
-        />
-        {showFeedback && !generating && (
+        <OutfitGrid outfit={outfit} generating={generating} />
+
+        {(outfit || generating) && (
           <div className="feedback-panel">
-            <h3 className="feedback-title">How was that outfit?</h3>
+            <div className="feedback-header">
+              <h3 className="feedback-title">Rate this outfit</h3>
+              {rating > 0 && <span className="rating-label">{RATING_LABELS[rating]}</span>}
+            </div>
             <div className="rating-row">
               {[1, 2, 3, 4, 5].map(n => (
                 <button
                   key={n}
-                  className={`rating-btn${feedback.rating === n ? ' rating-active' : ''}`}
-                  onClick={() => setFeedback(f => ({ ...f, rating: n }))}
+                  className={`rating-btn${rating === n ? ' rating-active' : ''}`}
+                  onClick={() => setRating(r => r === n ? 0 : n)}
+                  disabled={generating}
                 >
-                  {n}
+                  {'★'.repeat(n)}{'☆'.repeat(5 - n)}
                 </button>
               ))}
             </div>
             <textarea
               className="feedback-text"
-              placeholder="Any comments? (e.g. more colorful, less formal…)"
-              value={feedback.text}
-              onChange={e => setFeedback(f => ({ ...f, text: e.target.value }))}
+              placeholder="Tell Claude what you like or don't like… (e.g. more colorful, cheaper shoes, no jacket)"
+              value={feedbackText}
+              onChange={e => setFeedbackText(e.target.value)}
               rows={2}
+              disabled={generating}
             />
-            <div className="feedback-actions">
-              <button className="btn-primary" onClick={() => handleRegenerate(feedback)}>
-                Regenerate with Feedback
-              </button>
-              <button className="btn-secondary" onClick={() => handleRegenerate(null)}>
-                Skip — Just Regenerate
-              </button>
-              <button className="btn-secondary" onClick={() => setShowFeedback(false)}>
-                Cancel
-              </button>
-            </div>
+            <button
+              className="btn-primary"
+              style={{ alignSelf: 'flex-start' }}
+              onClick={handleRegenerate}
+              disabled={generating}
+            >
+              {generating ? 'Building outfit…' : '↺ Regenerate Outfit'}
+            </button>
           </div>
         )}
       </main>

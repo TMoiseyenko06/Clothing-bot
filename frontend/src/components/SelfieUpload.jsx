@@ -2,20 +2,30 @@ import { useState, useRef } from 'react'
 
 const GENDERS = ['Men', 'Women', 'Unisex']
 const STYLES = ['Casual', 'Formal', 'Streetwear', 'Minimalist', 'Sporty', 'Vintage', 'Bohemian', 'Smart Casual']
+const BUDGETS = [
+  { label: 'Budget  <$50', value: 'budget' },
+  { label: 'Mid  $50–$150', value: 'midrange' },
+  { label: 'Premium  $150–$300', value: 'premium' },
+  { label: 'Luxury  $300+', value: 'luxury' },
+]
 
 function Chips({ options, value, onChange }) {
   return (
     <div className="chip-group">
-      {options.map(opt => (
-        <button
-          key={opt}
-          type="button"
-          className={`chip ${value === opt.toLowerCase() ? 'chip-active' : ''}`}
-          onClick={() => onChange(opt.toLowerCase())}
-        >
-          {opt}
-        </button>
-      ))}
+      {options.map(opt => {
+        const label = typeof opt === 'string' ? opt : opt.label
+        const val = typeof opt === 'string' ? opt.toLowerCase() : opt.value
+        return (
+          <button
+            key={val}
+            type="button"
+            className={`chip ${value === val ? 'chip-active' : ''}`}
+            onClick={() => onChange(val)}
+          >
+            {label}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -26,6 +36,7 @@ export default function SelfieUpload({ onUpload, loading, error }) {
   const [drag, setDrag] = useState(false)
   const [gender, setGender] = useState('unisex')
   const [stylePref, setStylePref] = useState('casual')
+  const [budget, setBudget] = useState('midrange')
   const inputRef = useRef()
 
   const handleFile = (f) => {
@@ -52,8 +63,7 @@ export default function SelfieUpload({ onUpload, loading, error }) {
     <div className="selfie-upload">
       <h1>AI Outfit Builder</h1>
       <p className="subtitle">
-        Upload a photo and get a personalized outfit from a real fashion catalog,
-        analyzed and styled entirely on-device.
+        Upload a photo and get a personalized outfit recommendation with real, shoppable products.
       </p>
 
       <label
@@ -97,6 +107,10 @@ export default function SelfieUpload({ onUpload, loading, error }) {
           <label className="pref-label">Style</label>
           <Chips options={STYLES} value={stylePref} onChange={setStylePref} />
         </div>
+        <div className="pref-group">
+          <label className="pref-label">Budget</label>
+          <Chips options={BUDGETS} value={budget} onChange={setBudget} />
+        </div>
       </div>
 
       {error && <p className="error">{error}</p>}
@@ -105,7 +119,7 @@ export default function SelfieUpload({ onUpload, loading, error }) {
         <button
           className="btn-primary"
           style={{ marginTop: 24, width: '100%' }}
-          onClick={() => !loading && onUpload(file, gender, stylePref)}
+          onClick={() => !loading && onUpload(file, gender, stylePref, budget)}
           disabled={loading}
         >
           {loading ? 'Analyzing your style...' : 'Analyze My Style →'}

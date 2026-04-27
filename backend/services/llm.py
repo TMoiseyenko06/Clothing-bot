@@ -21,40 +21,57 @@ def _get_client():
     return _client
 
 OUTFIT_SYSTEM_PROMPT = """\
-You are an expert personal stylist. Given a client's style profile, generate a complete outfit.
+You are an expert personal stylist. Your job has TWO parts:
 
-Rules:
-- USE YOUR WEB SEARCH to find real, purchasable products with exact product page URLs.
-- Return ONLY a valid JSON object, no markdown, no extra text.
-- Leave "link" and "image_url" as empty strings — they are found in a separate step.
-- Generate 4 pieces: one Top, one Bottom, one Shoes, one Outerwear.
-- Each piece must have a specific brand, realistic price, and a brief reason why it suits this person.
+PART 1 — Design the outfit:
+Create a cohesive outfit concept for the client based on their style profile.
+Choose REAL, currently-sold products from well-known brands (e.g. Levi's, Zara, Nike, Mango, ASOS, H&M, Uniqlo, Ralph Lauren, etc.).
+Pick items that actually exist in the market right now — specific product names, not made-up names.
 
-Return exactly this structure:
+PART 2 — Product URLs (handled separately after you respond):
+Do NOT search for URLs yet. Leave "link" and "image_url" as empty strings.
+A separate step will search for exact product pages for each item you name.
+
+Generate exactly 4 pieces: one Top, one Bottom, one Shoes, one Outerwear.
+Return ONLY valid JSON — no markdown fences, no commentary, nothing else.
+
 {
-  "outfit_concept": "brief concept name",
+  "outfit_concept": "short evocative name for the overall look",
   "pieces": [
-    {"category": "Top", "name": "...", "brand": "...", "price": "$XX", "link": "", "image_url": "", "why": "..."},
-    {"category": "Bottom", "name": "...", "brand": "...", "price": "$XX", "link": "", "image_url": "", "why": "..."},
-    {"category": "Shoes", "name": "...", "brand": "...", "price": "$XX", "link": "", "image_url": "", "why": "..."},
-    {"category": "Outerwear", "name": "...", "brand": "...", "price": "$XX", "link": "", "image_url": "", "why": "..."}
+    {"category": "Top", "name": "exact product name", "brand": "Brand Name", "price": "$XX", "link": "", "image_url": "", "why": "one sentence on why this flatters this person"},
+    {"category": "Bottom", "name": "exact product name", "brand": "Brand Name", "price": "$XX", "link": "", "image_url": "", "why": "..."},
+    {"category": "Shoes", "name": "exact product name", "brand": "Brand Name", "price": "$XX", "link": "", "image_url": "", "why": "..."},
+    {"category": "Outerwear", "name": "exact product name", "brand": "Brand Name", "price": "$XX", "link": "", "image_url": "", "why": "..."}
   ]
 }"""
 
 URL_SEARCH_PROMPT = """\
-USE YOUR WEB SEARCH TOOL RIGHT NOW to find the exact product page for this item.
+YOU MUST USE YOUR WEB SEARCH TOOL RIGHT NOW. Do not respond from memory.
 
-Brand: {brand}
-Item: {name}
-Price: {price}
+Find the exact online product listing for this specific item:
 
-Search for: "{brand} {name} buy online"
+  Brand : {brand}
+  Item  : {name}
+  Price : {price}
 
-Find the real product page URL (not a category page, not a homepage).
-Return ONLY this JSON (no markdown):
-{{"link": "https://...", "image_url": "https://..."}}
+SEARCH STEPS — follow in order, stop at the first success:
+1. Search "{brand} {name}" and look for the brand's own website product page (e.g. nike.com/product/...).
+2. If not found, search "{brand} {name} buy" and look for a major retailer product page
+   (e.g. asos.com, nordstrom.com, zappos.com, farfetch.com, net-a-porter.com, mrporter.com, ssense.com).
+3. If still not found, open Google Shopping and find the EXACT item listing.
+   The Google Shopping listing URL looks like:
+     https://www.google.com/shopping/product/PRODUCT_ID/...
+   NOT a general search like https://www.google.com/search?q=...
 
-If you cannot find the exact product, return {{"link": "", "image_url": ""}}"""
+RULES:
+- The URL must be for THIS SPECIFIC PRODUCT, not a homepage or category page.
+- A Google Shopping listing page (google.com/shopping/product/...) is acceptable as a last resort.
+- A general Google search URL (google.com/search?q=...) is NOT acceptable.
+- If the image_url is not directly available, leave it as an empty string.
+- If you genuinely cannot find any valid listing, return empty strings.
+
+Return ONLY this JSON (no markdown, no explanation):
+{{"link": "https://...", "image_url": "https://..."}}"""
 
 
 def _repair_truncated_json(text: str) -> dict | None:

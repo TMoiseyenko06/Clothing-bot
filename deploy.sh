@@ -26,6 +26,10 @@ python -c "import torch; assert torch.cuda.is_available(), 'no cuda'" 2>/dev/nul
        pip install torch torchvision \
          --index-url https://download.pytorch.org/whl/cu121 -q; }
 
+# transformer_engine is pre-installed on some Vast.ai images but compiled against
+# a different torch ABI — it breaks transformers imports and we don't use it
+pip uninstall -y transformer-engine 2>/dev/null || true
+
 echo ">>> Installing backend dependencies..."
 pip install -r "$ROOT/backend/requirements.txt" -q --root-user-action=ignore
 

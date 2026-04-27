@@ -11,12 +11,24 @@ fi
 
 PORT="${PORT:-8000}"
 
-echo ">>> Installing PyTorch with CUDA (cu121)..."
-pip install torch==2.3.0 torchvision==0.18.0 \
-  --index-url https://download.pytorch.org/whl/cu121 -q
+# Install Node.js if missing (Vast.ai instances don't include it)
+if ! command -v npm &>/dev/null; then
+  echo ">>> Installing Node.js..."
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - -s -- -y
+  apt-get install -y nodejs
+fi
+
+# Only install torch if CUDA isn't already available
+# Vast.ai PyTorch templates ship with a newer torch — don't downgrade it
+python -c "import torch; assert torch.cuda.is_available(), 'no cuda'" 2>/dev/null \
+  && echo ">>> PyTorch with CUDA already present ($(python -c 'import torch; print(torch.__version__)'))" \
+  || { echo ">>> Installing PyTorch with CUDA (cu121)..."; \
+       pip install torch torchvision \
+         --index-url https://download.pytorch.org/whl/cu121 -q; }
 
 echo ">>> Installing backend dependencies..."
-pip install -r "$ROOT/backend/requirements.txt" -q
+pip install -r "$ROOT/backend/requirements.txt" -q \
+  --root-user-action=ignore 2>&1 | grep -v "^WARNING"
 
 echo ">>> Installing frontend dependencies..."
 cd "$ROOT/frontend"

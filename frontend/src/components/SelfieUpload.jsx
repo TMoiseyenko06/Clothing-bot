@@ -19,6 +19,7 @@ export default function SelfieUpload({ onUpload, loading, error }) {
   }
 
   const clearPhoto = (e) => {
+    e.preventDefault()
     e.stopPropagation()
     setPreview(null)
     setFile(null)
@@ -30,18 +31,19 @@ export default function SelfieUpload({ onUpload, loading, error }) {
       <h1>AI Outfit Builder</h1>
       <p className="subtitle">
         Upload a photo of yourself and get a personalized outfit recommendation
-        based on your coloring, style, and preferences.
+        based on your coloring, style, and body type.
       </p>
 
-      <div
+      <label
         className={`upload-zone ${drag ? 'drag-over' : ''}`}
         onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
         onDragLeave={() => setDrag(false)}
         onDrop={handleDrop}
-        onClick={() => !preview && inputRef.current?.click()}
+        style={{ cursor: 'pointer', display: 'block' }}
       >
         <input
           ref={inputRef}
+          id="selfie-input"
           type="file"
           accept="image/*"
           onChange={(e) => handleFile(e.target.files[0])}
@@ -52,11 +54,7 @@ export default function SelfieUpload({ onUpload, loading, error }) {
           <div className="upload-preview">
             <img src={preview} alt="Your photo" />
             <p className="file-name">{file?.name}</p>
-            <button
-              className="btn-secondary"
-              style={{ marginTop: 12, fontSize: '0.82rem', padding: '8px 16px' }}
-              onClick={clearPhoto}
-            >
+            <button className="btn-secondary" style={{ marginTop: 12, fontSize: '0.82rem', padding: '8px 16px' }} onClick={clearPhoto}>
               Change photo
             </button>
           </div>
@@ -64,10 +62,10 @@ export default function SelfieUpload({ onUpload, loading, error }) {
           <>
             <div className="upload-icon">📷</div>
             <p>Click or drag to upload a photo</p>
-            <p className="hint">JPG, PNG, or WEBP — your face and outfit are most helpful</p>
+            <p className="hint">JPG, PNG, or WEBP</p>
           </>
         )}
-      </div>
+      </label>
 
       {error && <p className="error">{error}</p>}
 

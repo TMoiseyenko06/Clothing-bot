@@ -52,7 +52,7 @@ def _build_index():
     images_dir.mkdir(exist_ok=True)
 
     log.info("Downloading Marqo/deepfashion-multimodal dataset...")
-    ds = load_dataset("Marqo/deepfashion-multimodal", split="train")
+    ds = load_dataset("Marqo/deepfashion-multimodal", split="data")
 
     total = len(ds)
     if MAX_ITEMS and MAX_ITEMS < total:

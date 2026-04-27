@@ -44,7 +44,6 @@ export default function SelfieUpload({ onUpload, loading, error }) {
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="user"
           onChange={(e) => handleFile(e.target.files[0])}
           style={{ display: 'none' }}
         />

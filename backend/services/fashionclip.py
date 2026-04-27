@@ -11,11 +11,6 @@ _model = None
 _processor = None
 _load_lock = asyncio.Lock()
 
-_STYLE_LABELS = [
-    "casual everyday style", "formal office style", "streetwear urban style",
-    "preppy classic style", "bohemian free-spirited style", "minimalist clean style",
-    "sporty athletic style", "vintage retro style", "smart casual style",
-]
 _COLORING_LABELS = [
     "light fair pale skin tone", "medium light warm skin tone",
     "medium olive skin tone", "medium dark brown skin tone", "dark deep skin tone",
@@ -63,7 +58,6 @@ def _analyze_sync(image_bytes: bytes) -> dict:
     from PIL import Image
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     return {
-        "style": _top_label(image, _STYLE_LABELS),
         "coloring": _top_label(image, _COLORING_LABELS),
         "undertone": _top_label(image, _UNDERTONE_LABELS),
         "build": _top_label(image, _BUILD_LABELS),

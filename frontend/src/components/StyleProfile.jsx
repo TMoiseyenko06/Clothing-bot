@@ -4,7 +4,7 @@ const ATTR_LABELS = {
   coloring: 'Skin Tone',
   undertone: 'Undertone',
   build: 'Body Type',
-  hair: 'Hair',
+  hair: 'Hair Color',
 }
 
 function cleanLabel(str) {

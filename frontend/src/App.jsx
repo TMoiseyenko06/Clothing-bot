@@ -12,11 +12,11 @@ export default function App() {
   const [error, setError] = useState(null)
   const [tryOnState, setTryOnState] = useState(null)
 
-  const handleSelfie = async (file) => {
+  const handleSelfie = async (file, gender, stylePref) => {
     setLoading(true)
     setError(null)
     try {
-      const result = await analyzeSelfie(file)
+      const result = await analyzeSelfie(file, gender, stylePref)
       setSession(result)
     } catch (e) {
       setError(e.message || 'Failed to analyze photo')

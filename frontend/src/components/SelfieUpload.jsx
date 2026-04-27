@@ -1,9 +1,31 @@
 import { useState, useRef } from 'react'
 
+const GENDERS = ['Men', 'Women', 'Unisex']
+const STYLES = ['Casual', 'Formal', 'Streetwear', 'Minimalist', 'Sporty', 'Vintage', 'Bohemian', 'Smart Casual']
+
+function Chips({ options, value, onChange }) {
+  return (
+    <div className="chip-group">
+      {options.map(opt => (
+        <button
+          key={opt}
+          type="button"
+          className={`chip ${value === opt.toLowerCase() ? 'chip-active' : ''}`}
+          onClick={() => onChange(opt.toLowerCase())}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function SelfieUpload({ onUpload, loading, error }) {
   const [preview, setPreview] = useState(null)
   const [file, setFile] = useState(null)
   const [drag, setDrag] = useState(false)
+  const [gender, setGender] = useState('unisex')
+  const [stylePref, setStylePref] = useState('casual')
   const inputRef = useRef()
 
   const handleFile = (f) => {
@@ -30,8 +52,8 @@ export default function SelfieUpload({ onUpload, loading, error }) {
     <div className="selfie-upload">
       <h1>AI Outfit Builder</h1>
       <p className="subtitle">
-        Upload a photo of yourself and get a personalized outfit recommendation
-        based on your coloring, style, and body type.
+        Upload a photo and get a personalized outfit from a real fashion catalog,
+        analyzed and styled entirely on-device.
       </p>
 
       <label
@@ -49,7 +71,6 @@ export default function SelfieUpload({ onUpload, loading, error }) {
           onChange={(e) => handleFile(e.target.files[0])}
           style={{ display: 'none' }}
         />
-
         {preview ? (
           <div className="upload-preview">
             <img src={preview} alt="Your photo" />
@@ -67,13 +88,24 @@ export default function SelfieUpload({ onUpload, loading, error }) {
         )}
       </label>
 
+      <div className="prefs">
+        <div className="pref-group">
+          <label className="pref-label">Gender</label>
+          <Chips options={GENDERS} value={gender} onChange={setGender} />
+        </div>
+        <div className="pref-group">
+          <label className="pref-label">Style</label>
+          <Chips options={STYLES} value={stylePref} onChange={setStylePref} />
+        </div>
+      </div>
+
       {error && <p className="error">{error}</p>}
 
       {preview && (
         <button
           className="btn-primary"
           style={{ marginTop: 24, width: '100%' }}
-          onClick={() => !loading && onUpload(file)}
+          onClick={() => !loading && onUpload(file, gender, stylePref)}
           disabled={loading}
         >
           {loading ? 'Analyzing your style...' : 'Analyze My Style →'}

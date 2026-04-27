@@ -131,11 +131,11 @@ async def swap_item(profile: dict, category: str, exclude_id: str | None = None)
 
 
 def _build_query(profile: dict) -> str:
-    return (
-        f"{profile.get('style', 'casual')} clothing for "
-        f"{profile.get('build', 'average')} person with "
-        f"{profile.get('coloring', 'medium')} complexion"
-    )
+    gender = profile.get("gender", "")
+    style = profile.get("style_pref") or profile.get("style", "casual")
+    build = profile.get("build", "average")
+    coloring = profile.get("coloring", "medium")
+    return f"{gender} {style} clothing for {build} person with {coloring} complexion".strip()
 
 
 def _search_outfit_sync(profile: dict) -> dict:

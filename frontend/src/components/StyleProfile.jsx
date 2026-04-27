@@ -1,5 +1,6 @@
 const ATTR_LABELS = {
-  style: 'Style',
+  gender: 'Gender',
+  style_pref: 'Style',
   coloring: 'Skin Tone',
   undertone: 'Undertone',
   build: 'Body Type',

@@ -14,7 +14,7 @@ PORT="${PORT:-8000}"
 # Install Node.js if missing (Vast.ai instances don't include it)
 if ! command -v npm &>/dev/null; then
   echo ">>> Installing Node.js..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - -s -- -y
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
   apt-get install -y nodejs
 fi
 

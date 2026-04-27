@@ -14,16 +14,16 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def create_session(session_id: str, selfie_path: str, profile: dict) -> dict:
+def create_session(session_id: str, selfie_path: str, style_profile: str) -> dict:
     OUTFITS_DIR.mkdir(parents=True, exist_ok=True)
     _session_dir(session_id).mkdir(parents=True, exist_ok=True)
     session = {
         "session_id": session_id,
         "selfie_path": selfie_path,
         "selfie_url": f"/files/{session_id}/selfie.jpg",
-        "profile": profile,
-        "outfit": {},
-        "tryon_results": {},
+        "style_profile": style_profile,
+        "outfits": [],
+        "feedbacks": [],
         "created_at": _now(),
     }
     _write(session_id, session)
@@ -46,21 +46,13 @@ def save_selfie(session_id: str, data: bytes) -> str:
     return str(path)
 
 
-def update_outfit(session_id: str, outfit: dict) -> dict:
+def save_outfit(session_id: str, outfit: dict, feedback: dict | None) -> dict:
     session = load_session(session_id)
-    session["outfit"] = outfit
+    session["outfits"].append(outfit)
+    if feedback:
+        session["feedbacks"].append(feedback)
     _write(session_id, session)
     return session
-
-
-def save_tryon(session_id: str, item_id: str, image_bytes: bytes) -> str:
-    path = _session_dir(session_id) / f"tryon_{item_id}.jpg"
-    path.write_bytes(image_bytes)
-    url = f"/files/{session_id}/tryon_{item_id}.jpg"
-    session = load_session(session_id)
-    session["tryon_results"][item_id] = url
-    _write(session_id, session)
-    return url
 
 
 def _write(session_id: str, session: dict):

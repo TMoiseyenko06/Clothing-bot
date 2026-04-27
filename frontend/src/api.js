@@ -13,41 +13,15 @@ export async function analyzeSelfie(file, gender = 'unisex', stylePref = 'casual
   return res.json()
 }
 
-export async function refreshOutfit(session_id) {
-  const res = await fetch(`${BASE}/outfit/refresh`, {
+export async function generateOutfit(session_id, feedback = null) {
+  const res = await fetch(`${BASE}/outfit/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id }),
+    body: JSON.stringify({ session_id, feedback }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || 'Refresh failed')
-  }
-  return res.json()
-}
-
-export async function swapItem(session_id, category) {
-  const res = await fetch(`${BASE}/outfit/swap`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id, category }),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || 'Swap failed')
-  }
-  return res.json()
-}
-
-export async function tryOn(session_id, item_id, category) {
-  const res = await fetch(`${BASE}/tryon`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id, item_id, category }),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || 'Try-on failed')
+    throw new Error(err.detail || 'Generation failed')
   }
   return res.json()
 }

@@ -1,7 +1,8 @@
 import uuid
 import logging
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from services import fashionclip, deepfashion, storage
+from services import fashionclip, storage
+from services.llm import _build_style_string
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -27,16 +28,13 @@ async def analyze(
         profile["style_pref"] = style_pref
         log.info("Profile — %s", profile)
 
-        outfit = await deepfashion.search_outfit(profile)
-        log.info("Outfit — categories=%s", list(outfit.keys()))
-
-        session = storage.create_session(session_id, selfie_path, profile)
-        storage.update_outfit(session_id, outfit)
+        style_string = _build_style_string(profile)
+        session = storage.create_session(session_id, selfie_path, style_string)
 
         return {
             "session_id": session_id,
             "profile": profile,
-            "outfit": outfit,
+            "style_profile": style_string,
             "selfie_url": session["selfie_url"],
         }
     except Exception as e:

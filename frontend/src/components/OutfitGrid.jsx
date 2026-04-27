@@ -1,28 +1,37 @@
 import OutfitCard from './OutfitCard'
 
-const CATEGORY_ORDER = ['Top', 'Bottom', 'Shoes', 'Outerwear']
+export default function OutfitGrid({ outfit, generating, onRegenerate }) {
+  if (generating) {
+    return (
+      <div className="loading" style={{ minHeight: 320 }}>
+        <div className="spinner" />
+        <span>Building your outfit…</span>
+      </div>
+    )
+  }
 
-export default function OutfitGrid({ outfit, loading, onRefresh, onSwap, onTryOn }) {
-  const items = CATEGORY_ORDER.map(cat => outfit[cat]).filter(Boolean)
+  if (!outfit) return null
+
+  const pieces = outfit.pieces || []
 
   return (
     <div className="outfit-grid-container">
       <div className="outfit-grid-header">
-        <h2 className="outfit-title">Your Outfit</h2>
-        <button className="btn-secondary" onClick={onRefresh} disabled={loading}>
-          {loading ? 'Finding...' : '↺ Regenerate'}
+        <div>
+          <h2 className="outfit-title">Your Outfit</h2>
+          {outfit.outfit_concept && (
+            <p className="outfit-concept">{outfit.outfit_concept}</p>
+          )}
+        </div>
+        <button className="btn-secondary" onClick={onRegenerate}>
+          ↺ Regenerate
         </button>
       </div>
       <div className="outfit-grid">
-        {items.map(item => (
-          <OutfitCard
-            key={item.id}
-            item={item}
-            onSwap={() => onSwap(item.category)}
-            onTryOn={() => onTryOn(item)}
-          />
+        {pieces.map((piece, i) => (
+          <OutfitCard key={`${piece.category}-${i}`} piece={piece} />
         ))}
-        {items.length === 0 && (
+        {pieces.length === 0 && (
           <p className="empty-outfit">No items found. Try regenerating.</p>
         )}
       </div>

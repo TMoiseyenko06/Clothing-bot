@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from services import logbuffer
-from routes import analyze, outfit, tryon
+from routes import analyze, outfit
 
 logbuffer.setup()
 
@@ -22,16 +22,12 @@ app.add_middleware(
 
 app.include_router(analyze.router, prefix="/api")
 app.include_router(outfit.router, prefix="/api")
-app.include_router(tryon.router, prefix="/api")
 
 OUTFITS_DIR = Path(os.environ.get("OUTFITS_DIR", "./outfits"))
-CATALOG_DIR = Path(os.environ.get("CATALOG_DIR", "./catalog"))
 FRONTEND_DIST = Path(os.environ.get("FRONTEND_DIST", ""))
 OUTFITS_DIR.mkdir(parents=True, exist_ok=True)
-CATALOG_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount("/files", StaticFiles(directory=str(OUTFITS_DIR)), name="files")
-app.mount("/catalog", StaticFiles(directory=str(CATALOG_DIR)), name="catalog")
 
 
 @app.get("/api/logs")
@@ -39,6 +35,5 @@ def get_logs():
     return logbuffer.get_logs()
 
 
-# Serve built React app — must be last so API routes take priority
 if FRONTEND_DIST and FRONTEND_DIST.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="spa")

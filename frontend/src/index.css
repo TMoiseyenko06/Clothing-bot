@@ -329,8 +329,22 @@ button {
   font-weight: 700;
 }
 
-.outfit-card-desc {
-  font-size: 0.85rem;
+.outfit-card-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.outfit-card-brand {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.outfit-card-why {
+  font-size: 0.8rem;
   color: var(--text-muted);
   line-height: 1.4;
   flex: 1;
@@ -340,140 +354,102 @@ button {
   overflow: hidden;
 }
 
-.outfit-card-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.btn-swap {
-  flex: 1;
-  background: var(--surface-2);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  font-size: 0.8rem;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.btn-swap:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-.btn-tryon {
-  flex: 1;
-  background: var(--accent);
-  color: #0f0f0f;
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  transition: background 0.15s;
-}
-
-.btn-tryon:hover { background: var(--accent-hover); }
-
-/* Try-On Modal */
-.tryon-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-.tryon-modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  width: min(860px, 96vw);
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
-  overflow: hidden;
-}
-
-.tryon-header {
+.outfit-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
+  margin-top: 10px;
+}
+
+.outfit-card-price {
   font-size: 0.95rem;
-  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--accent);
 }
 
-.tryon-close {
-  background: transparent;
+.btn-shop {
+  background: var(--accent);
+  color: #0f0f0f;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+  display: inline-block;
+}
+
+.btn-shop:hover { background: var(--accent-hover); }
+
+/* Outfit concept subtitle */
+.outfit-concept {
+  font-size: 0.88rem;
   color: var(--text-muted);
-  font-size: 1.1rem;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: color 0.15s;
+  margin-top: 4px;
+  font-style: italic;
 }
 
-.tryon-close:hover { color: var(--text); }
-
-.tryon-content {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-.tryon-result-area {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg);
-  min-height: 400px;
-  overflow: hidden;
-}
-
-.tryon-result-img {
-  max-width: 100%;
-  max-height: 70vh;
-  object-fit: contain;
-  display: block;
-}
-
-.tryon-garment-panel {
-  width: 180px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
-  padding: 16px;
+/* Feedback panel */
+.feedback-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-top: 24px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 16px;
 }
 
-.tryon-garment-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
+.feedback-title {
+  font-size: 1rem;
   font-weight: 600;
 }
 
-.tryon-garment-img {
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
+.rating-row {
+  display: flex;
+  gap: 8px;
 }
 
-.tryon-garment-desc {
-  font-size: 0.8rem;
+.rating-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   color: var(--text-muted);
-  line-height: 1.4;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.rating-btn:hover { border-color: var(--accent); color: var(--text); }
+
+.rating-active {
+  background: var(--accent);
+  color: #0f0f0f;
+  border-color: var(--accent);
+}
+
+.feedback-text {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 10px 14px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.feedback-text:focus { border-color: var(--accent); }
+
+.feedback-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 600px) {
@@ -481,7 +457,5 @@ button {
   .nav { padding: 12px 16px; }
   .main { padding: 24px 14px; }
   .style-profile { flex-direction: column; align-items: flex-start; }
-  .tryon-content { flex-direction: column; }
-  .tryon-garment-panel { width: 100%; border-left: none; border-top: 1px solid var(--border); flex-direction: row; align-items: center; }
-  .tryon-garment-img { width: 80px; height: 100px; }
+  .feedback-actions { flex-direction: column; }
 }

@@ -27,8 +27,7 @@ python -c "import torch; assert torch.cuda.is_available(), 'no cuda'" 2>/dev/nul
          --index-url https://download.pytorch.org/whl/cu121 -q; }
 
 echo ">>> Installing backend dependencies..."
-pip install -r "$ROOT/backend/requirements.txt" -q \
-  --root-user-action=ignore 2>&1 | grep -v "^WARNING"
+pip install -r "$ROOT/backend/requirements.txt" -q --root-user-action=ignore
 
 echo ">>> Installing frontend dependencies..."
 cd "$ROOT/frontend"

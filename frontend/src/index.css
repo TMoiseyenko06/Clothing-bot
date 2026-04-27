@@ -295,6 +295,10 @@ button {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
+.outfit-card-img-wrap {
+  position: relative;
+}
+
 .outfit-card-image {
   width: 100%;
   aspect-ratio: 3 / 4;
@@ -312,6 +316,88 @@ button {
   justify-content: center;
   font-size: 3rem;
 }
+
+.btn-replace-img {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.6);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 7px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.outfit-card:hover .btn-replace-img { opacity: 1; }
+
+/* Replace image panel */
+.replace-panel {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.replace-opt {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.replace-opt:hover { border-color: var(--accent); }
+
+.replace-url-row {
+  display: flex;
+  gap: 6px;
+}
+
+.replace-url-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  outline: none;
+}
+
+.replace-url-input:focus { border-color: var(--accent); }
+
+.replace-url-go {
+  background: var(--accent);
+  color: #0f0f0f;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.replace-cancel {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.replace-cancel:hover { color: var(--text); }
 
 .outfit-card-body {
   padding: 14px 16px;
@@ -359,6 +445,8 @@ button {
   align-items: center;
   justify-content: space-between;
   margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .outfit-card-price {
@@ -367,19 +455,142 @@ button {
   color: var(--accent);
 }
 
+.outfit-card-actions-row {
+  display: flex;
+  gap: 6px;
+}
+
 .btn-shop {
-  background: var(--accent);
-  color: #0f0f0f;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 6px 14px;
-  font-size: 0.8rem;
+  padding: 6px 12px;
+  font-size: 0.78rem;
   font-weight: 600;
   text-decoration: none;
-  transition: background 0.15s;
+  transition: border-color 0.15s, color 0.15s;
   display: inline-block;
 }
 
-.btn-shop:hover { background: var(--accent-hover); }
+.btn-shop:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-tryon {
+  background: var(--accent);
+  color: #0f0f0f;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-tryon:hover { background: var(--accent-hover); }
+
+/* Try-On Modal */
+.tryon-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.tryon-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: min(900px, 96vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.8);
+}
+
+.tryon-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.tryon-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+
+.tryon-close:hover { color: var(--text); }
+
+.tryon-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 400px;
+}
+
+.tryon-result-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.tryon-result-img {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  display: block;
+}
+
+.tryon-garment-panel {
+  width: 180px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tryon-garment-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.tryon-garment-img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.tryon-garment-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
 
 /* Outfit concept subtitle */
 .outfit-concept {
@@ -465,5 +676,7 @@ button {
   .nav { padding: 12px 16px; }
   .main { padding: 24px 14px; }
   .style-profile { flex-direction: column; align-items: flex-start; }
-  .feedback-actions { flex-direction: column; }
+  .tryon-body { flex-direction: column; }
+  .tryon-garment-panel { width: 100%; border-left: none; border-top: 1px solid var(--border); flex-direction: row; align-items: center; }
+  .tryon-garment-img { width: 70px; height: 90px; }
 }

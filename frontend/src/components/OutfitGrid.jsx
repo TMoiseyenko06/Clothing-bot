@@ -1,6 +1,6 @@
 import OutfitCard from './OutfitCard'
 
-export default function OutfitGrid({ outfit, generating }) {
+export default function OutfitGrid({ outfit, generating, onTryOn, onImageUpdate }) {
   if (generating) {
     return (
       <div className="loading" style={{ minHeight: 320 }}>
@@ -26,7 +26,12 @@ export default function OutfitGrid({ outfit, generating }) {
       </div>
       <div className="outfit-grid">
         {pieces.map((piece, i) => (
-          <OutfitCard key={`${piece.category}-${i}`} piece={piece} />
+          <OutfitCard
+            key={`${piece.category}-${i}`}
+            piece={piece}
+            onTryOn={onTryOn}
+            onImageUpdate={onImageUpdate}
+          />
         ))}
         {pieces.length === 0 && (
           <p className="empty-outfit">No items found. Try regenerating.</p>

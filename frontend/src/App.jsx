@@ -2,7 +2,8 @@ import { useState } from 'react'
 import SelfieUpload from './components/SelfieUpload'
 import StyleProfile from './components/StyleProfile'
 import OutfitGrid from './components/OutfitGrid'
-import { analyzeSelfie, generateOutfit } from './api'
+import TryOnModal from './components/TryOnModal'
+import { analyzeSelfie, generateOutfit, runTryOn, updatePieceImage } from './api'
 import './index.css'
 
 const RATING_LABELS = { 1: 'Hate it', 2: 'Not great', 3: 'OK', 4: 'Like it', 5: 'Love it' }
@@ -15,6 +16,7 @@ export default function App() {
   const [error, setError] = useState(null)
   const [rating, setRating] = useState(0)
   const [feedbackText, setFeedbackText] = useState('')
+  const [tryOn, setTryOn] = useState(null)  // { piece, loading, resultUrl, error }
 
   const handleSelfie = async (file, gender, stylePref, budget) => {
     setLoading(true)
@@ -52,6 +54,30 @@ export default function App() {
     }
   }
 
+  const handleTryOn = async (piece) => {
+    setTryOn({ piece, loading: true, resultUrl: null, error: null })
+    try {
+      const res = await runTryOn(session.session_id, piece.category)
+      setTryOn(s => ({ ...s, loading: false, resultUrl: res.result_url }))
+    } catch (e) {
+      setTryOn(s => ({ ...s, loading: false, error: e.message }))
+    }
+  }
+
+  const handleImageUpdate = async (category, file, imageUrl) => {
+    try {
+      const res = await updatePieceImage(session.session_id, category, file, imageUrl)
+      setOutfit(o => ({
+        ...o,
+        pieces: o.pieces.map(p =>
+          p.category === category ? { ...p, image_url: res.image_url } : p
+        ),
+      }))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   if (!session) {
     return (
       <div className="app">
@@ -80,7 +106,12 @@ export default function App() {
       <main className="main">
         <StyleProfile profile={session.profile} selfieUrl={session.selfie_url} />
         {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
-        <OutfitGrid outfit={outfit} generating={generating} />
+        <OutfitGrid
+          outfit={outfit}
+          generating={generating}
+          onTryOn={handleTryOn}
+          onImageUpdate={handleImageUpdate}
+        />
 
         {(outfit || generating) && (
           <div className="feedback-panel">
@@ -119,6 +150,16 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {tryOn && (
+        <TryOnModal
+          piece={tryOn.piece}
+          loading={tryOn.loading}
+          resultUrl={tryOn.resultUrl}
+          error={tryOn.error}
+          onClose={() => setTryOn(null)}
+        />
+      )}
     </div>
   )
 }

@@ -55,6 +55,18 @@ def save_outfit(session_id: str, outfit: dict, feedback: dict | None) -> dict:
     return session
 
 
+def update_piece_image(session_id: str, category: str, image_url: str) -> dict:
+    session = load_session(session_id)
+    if not session or not session.get("outfits"):
+        return session or {}
+    for piece in session["outfits"][-1].get("pieces", []):
+        if piece.get("category") == category:
+            piece["image_url"] = image_url
+            break
+    _write(session_id, session)
+    return session
+
+
 def _write(session_id: str, session: dict):
     path = _session_dir(session_id) / "session.json"
     with open(path, "w") as f:

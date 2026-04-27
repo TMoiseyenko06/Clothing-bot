@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from services import logbuffer
-from routes import analyze, outfit
+from routes import analyze, outfit, tryon
 
 logbuffer.setup()
 
@@ -22,6 +22,7 @@ app.add_middleware(
 
 app.include_router(analyze.router, prefix="/api")
 app.include_router(outfit.router, prefix="/api")
+app.include_router(tryon.router, prefix="/api")
 
 OUTFITS_DIR = Path(os.environ.get("OUTFITS_DIR", "./outfits"))
 FRONTEND_DIST = Path(os.environ.get("FRONTEND_DIST", ""))
